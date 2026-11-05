@@ -2,6 +2,9 @@
 import { build } from 'esbuild';
 import fs from 'fs';
 const src = fs.existsSync('web') ? 'web' : '../app/src';
+fs.mkdirSync('www/fonts', { recursive: true });
+for (const f of ['Vazirmatn-Regular.woff2', 'Vazirmatn-Bold.woff2']) fs.copyFileSync('node_modules/vazirmatn/fonts/webfonts/' + f, 'www/fonts/' + f);
+fs.copyFileSync('node_modules/vazirmatn/OFL.txt', 'www/fonts/OFL.txt');
 await build({ entryPoints: ['src/native.js'], bundle: true, format: 'iife', outfile: 'www/native.js', minify: true, target: 'es2019' });
 const css = fs.readFileSync(src + '/style.css', 'utf8');
 const font = `@font-face{font-family:Vazirmatn;font-weight:400;font-display:swap;src:url(fonts/Vazirmatn-Regular.woff2) format('woff2')}@font-face{font-family:Vazirmatn;font-weight:700;font-display:swap;src:url(fonts/Vazirmatn-Bold.woff2) format('woff2')}html,body{overscroll-behavior:none}`;
