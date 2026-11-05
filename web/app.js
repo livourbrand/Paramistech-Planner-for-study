@@ -59,7 +59,7 @@
     const mk = (name, type, cs, i) => ({ id: uid(), name, type, color: COLORS[i % COLORS.length], combos: cs, coef: {}, archived: false, createdAt: t, updatedAt: t, deletedAt: null });
     return {
       app: 'konkur-dr-study', schema: SCHEMA, updatedAt: 0,
-      settings: { onboarded: false, examDate: '2027-01-31', testCount: 20, masteryPct: 90, reviewPct: 75, negOn: false, negRatio: 3, theme: 'auto', lastBackupAt: null, capacity: [360, 360, 360, 360, 360, 240, 360] },
+      settings: { onboarded: false, examDate: '2027-01-31', testCount: 20, masteryPct: 90, reviewPct: 75, negOn: false, negRatio: 3, theme: 'auto', lastBackupAt: null, introDone: false, seenTips: {}, checklistHidden: false, capacity: [360, 360, 360, 360, 360, 240, 360] },
       combos,
       courses: [
         mk('زبان انگلیسی', 'test', all, 6), mk('آمار و کاربرد در مدیریت', 'chapter', all, 1), mk('مبانی سازمان و مدیریت', 'chapter', all, 0),
@@ -81,6 +81,8 @@
       if (o.timer && o.timer.step && STUDY_STEPS.includes(o.timer.step)) o.timer.step = 'study';
       if (o.timer && o.timer.step === 'similar') o.timer.step = 'test';
     }
+    if (o.settings.onboarded && o.settings.introDone === false && !o.settings.seenTips) o.settings.introDone = true;
+    if (!o.settings.seenTips) o.settings.seenTips = {};
     o.schema = SCHEMA;
     return o;
   }
@@ -247,7 +249,7 @@
     if (!S.settings.onboarded) { app().innerHTML = '<div class="wrap">' + vOnboard() + '</div>'; return; }
     const c = cur(); let html = '';
     try {
-      const V = { today: vToday, plan: vPlan, courses: vCourses, course: vCourse, book: vBook, chapter: vChapter, session: vSession, stats: vStats, more: vMore, settings: vSettings, combos: vCombos, bin: vBin, backup: vBackup, audit: vAudit, selftest: vSelfTest, sessions: vSessions };
+      const V = { today: vToday, plan: vPlan, courses: vCourses, course: vCourse, book: vBook, chapter: vChapter, session: vSession, stats: vStats, more: vMore, settings: vSettings, combos: vCombos, bin: vBin, backup: vBackup, audit: vAudit, selftest: vSelfTest, sessions: vSessions, help: vHelp, intro: () => vIntro(true) };
       html = (V[c.s] || vToday)(c);
     } catch (e) { console.error(e); html = '<div class="banner bad">خطا در نمایش این صفحه. <button class="btn sm" data-a="home">بازگشت به امروز</button></div>'; }
     const tabs = [['today', 'امروز', ICON.today], ['plan', 'برنامه', ICON.plan], ['courses', 'درس‌ها', ICON.book], ['stats', 'آمار', ICON.stats], ['more', 'بیشتر', ICON.more]];
@@ -262,6 +264,7 @@
   function capacityInputs(cap) { return '<div class="grid4" style="grid-template-columns:repeat(4,1fr)">' + WD_ORDER.map((wd) => num('cap' + wd, WD[wd], Math.round(cap[wd] / 60 * 10) / 10)).join('') + '</div>'; }
   function readCapacity(f) { const out = []; for (let wd = 0; wd < 7; wd++) { const n = L.parseNum(f['cap' + wd].value); if (n == null || Number.isNaN(n) || n < 0 || n > 18) return null; out[wd] = Math.round(n * 60); } return out; }
   function vOnboard() {
+    if (!S.settings.introDone) return vIntro(false);
     if (!ob) ob = { step: 0, err: '' };
     const st = ob.step, N = 4;
     const head = '<div class="small muted" style="margin-top:8px">مرحله ' + faD(st + 1) + ' از ' + faD(N) + '</div><div class="bar" style="margin:6px 0 16px"><i style="width:' + ((st + 1) / N * 100) + '%"></i></div>';
@@ -283,6 +286,82 @@
       (ob.err ? '<div class="err" role="alert">' + esc(ob.err) + '</div>' : '') + '<button class="btn pri block big" style="margin-top:16px">ثبت و شروع</button></form><button class="btn ghost block" style="margin-top:8px" data-a="obFinish">فعلاً بدون کتاب شروع کن</button>' + prev;
   }
 
+  // ---------- guidance: intro, tips, checklist, help ----------
+  const ART = {
+    welcome: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true"><rect x="80" y="10" width="80" height="80" rx="20" fill="#1F5E57"/><circle cx="120" cy="50" r="25" fill="none" stroke="#2F7A71" stroke-width="6"/><path d="M120 25 A25 25 0 1 1 95 50" fill="none" stroke="#F4E3B5" stroke-width="6" stroke-linecap="round"/><path d="M114 63 V38 H123 A8 8 0 0 1 123 54 H114" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><rect x="40" y="108" width="44" height="10" rx="5" fill="var(--acc-soft)"/><rect x="98" y="108" width="44" height="10" rx="5" fill="var(--acc)"/><rect x="156" y="108" width="44" height="10" rx="5" fill="var(--acc-soft)"/></svg>',
+    plan: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true">' + [0, 1, 2, 3, 4, 5, 6].map((i) => { const h = [60, 80, 45, 90, 70, 30, 75][i]; return '<rect x="' + (22 + i * 30) + '" y="' + (120 - h) + '" width="20" height="' + h + '" rx="5" fill="' + (i === 3 ? 'var(--bad)' : 'var(--acc)') + '" opacity="' + (i === 3 ? 1 : 0.85) + '"/>'; }).join('') + '<line x1="14" x2="226" y1="40" y2="40" stroke="var(--ink)" stroke-width="2" stroke-dasharray="5 4"/><text x="226" y="32" font-size="11" text-anchor="end" fill="var(--muted)">ظرفیت روز</text></svg>',
+    round: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true"><circle cx="45" cy="60" r="28" fill="var(--acc-soft)" stroke="var(--acc)" stroke-width="3"/><path d="M45 44 V60 L56 67" fill="none" stroke="var(--acc)" stroke-width="3" stroke-linecap="round"/><text x="45" y="112" font-size="12" text-anchor="middle" fill="var(--ink)">مطالعه</text><path d="M80 60 H100" stroke="var(--muted)" stroke-width="2"/><path d="M96 55 L102 60 L96 65" fill="none" stroke="var(--muted)" stroke-width="2"/><rect x="104" y="34" width="34" height="52" rx="6" fill="var(--card)" stroke="var(--acc)" stroke-width="3"/><path d="M111 48 H131 M111 60 H131 M111 72 H124" stroke="var(--acc)" stroke-width="3" stroke-linecap="round"/><text x="121" y="112" font-size="12" text-anchor="middle" fill="var(--ink)">تست</text><path d="M144 60 H164" stroke="var(--muted)" stroke-width="2"/><path d="M160 55 L166 60 L160 65" fill="none" stroke="var(--muted)" stroke-width="2"/><circle cx="196" cy="60" r="28" fill="var(--ok-soft)" stroke="var(--ok)" stroke-width="3"/><text x="196" y="66" font-size="16" font-weight="700" text-anchor="middle" fill="var(--ok)">۸۵٪</text><text x="196" y="112" font-size="12" text-anchor="middle" fill="var(--ink)">نتیجه</text></svg>',
+    compare: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true"><line x1="20" x2="220" y1="116" y2="116" stroke="var(--line)"/>' + [[50, 70, 60], [120, 52, 78], [190, 36, 90]].map(([x, h, p]) => '<rect x="' + (x - 16) + '" y="' + (116 - h) + '" width="32" height="' + h + '" rx="5" fill="var(--soft)" stroke="var(--line)"/>').join('') + '<path d="M50 70 L120 44 L190 26" fill="none" stroke="var(--acc)" stroke-width="3"/>' + [[50, 70, '۶۰٪'], [120, 44, '۷۸٪'], [190, 26, '۹۰٪']].map(([x, y, t]) => '<circle cx="' + x + '" cy="' + y + '" r="5" fill="var(--acc)"/><text x="' + x + '" y="' + (y - 10) + '" font-size="12" font-weight="700" text-anchor="middle" fill="var(--acc)">' + t + '</text>').join('') + '<text x="50" y="134" font-size="11" text-anchor="middle" fill="var(--muted)">دور ۱</text><text x="120" y="134" font-size="11" text-anchor="middle" fill="var(--muted)">دور ۲</text><text x="190" y="134" font-size="11" text-anchor="middle" fill="var(--muted)">دور ۳</text></svg>',
+    safe: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true"><rect x="88" y="14" width="64" height="112" rx="12" fill="var(--card)" stroke="var(--ink)" stroke-width="3"/><rect x="100" y="34" width="40" height="8" rx="4" fill="var(--acc)"/><rect x="100" y="50" width="30" height="8" rx="4" fill="var(--acc-soft)"/><rect x="100" y="66" width="36" height="8" rx="4" fill="var(--acc-soft)"/><path d="M168 64 h30 v34 h-30 z" fill="var(--acc-soft)" stroke="var(--acc)" stroke-width="3"/><path d="M174 64 v-10 a9 9 0 0 1 18 0 v10" fill="none" stroke="var(--acc)" stroke-width="3"/><text x="183" y="118" font-size="11" text-anchor="middle" fill="var(--muted)">پشتیبان</text></svg>',
+  };
+  const INTRO = [
+    ['welcome', 'به پارامیس تک خوش آمدید', 'برنامه‌ریز مطالعه‌ی کنکور دکتری مدیریت. سه کار اصلی دارد: برنامه بریزید، زمان و تست هر فصل را بسنجید، و ببینید هر فصل در هر دور چقدر بهتر شده.'],
+    ['plan', 'هر هفته برنامه بریزید', 'در تب «برنامه» برای هر روز فصل‌ها را با زمان هدف و تعداد تست هدف بچینید. اگر برنامه‌ی روزی از ساعت مفید آن روز بیشتر شود، نوارش قرمز می‌شود.'],
+    ['round', 'هر دور: مطالعه، تست، نتیجه', 'روی فصل «شروع دور» را بزنید: زمان‌سنج مطالعه، بعد زمان‌سنج تست، بعد تعداد صحیح یا درصد. بدون زمان‌سنج خواندید؟ «ثبت سریع» را بزنید.'],
+    ['compare', 'دورها را مقایسه کنید', 'هر بار که سراغ یک فصل برمی‌گردید یک دور تازه است. درصد و زمان همه‌ی دورها کنار هم نمایش داده می‌شود. زمان کمتر فقط وقتی پیشرفت است که درصد افت نکرده باشد.'],
+    ['safe', 'داده‌ها روی دستگاه شما', 'همه چیز روی همین دستگاه ذخیره می‌شود. هر هفته از «بیشتر ← پشتیبان» یک فایل پشتیبان بگیرید تا با عوض شدن گوشی چیزی از دست نرود.'],
+  ];
+  let introIdx = 0;
+  function vIntro(fromHelp) {
+    const [art, t, b] = INTRO[introIdx]; const last = introIdx === INTRO.length - 1;
+    return (fromHelp ? top('معرفی اپ') : '<div class="row between" style="margin-top:4px"><span class="small muted">' + faD(introIdx + 1) + ' از ' + faD(INTRO.length) + '</span><button class="btn ghost sm" data-a="introSkip">رد کردن</button></div>') +
+      '<div style="text-align:center;padding:12px 0 4px"><div style="max-width:300px;margin:0 auto">' + ART[art] + '</div><h1 style="margin-top:18px">' + t + '</h1><p class="muted" style="max-width:420px;margin:8px auto 0">' + b + '</p></div>' +
+      '<div class="row" style="justify-content:center;gap:6px;margin:20px 0" aria-hidden="true">' + INTRO.map((_, i) => '<span style="width:' + (i === introIdx ? 22 : 8) + 'px;height:8px;border-radius:8px;background:' + (i === introIdx ? 'var(--acc)' : 'var(--line)') + '"></span>').join('') + '</div>' +
+      '<div class="row">' + (introIdx > 0 ? '<button class="btn grow" data-a="introPrev">قبلی</button>' : '') + '<button class="btn pri big grow" data-a="introNext">' + (last ? (fromHelp ? 'پایان' : 'شروع تنظیمات') : 'بعدی') + '</button></div>';
+  }
+  const BULB = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z"/></svg>';
+  const TIPS = {
+    today: ['صفحه‌ی امروز', 'برنامه‌ی امروز و پیشرفت واقعی هر مورد اینجاست. «شروع دور» زمان‌سنج را باز می‌کند؛ «ثبت سریع» برای وقتی است که بدون زمان‌سنج خوانده‌اید.'],
+    plan: ['برنامه‌ی هفتگی', 'برای هر روز «افزودن» را بزنید و فصل، زمان هدف و تعداد تست هدف را تعیین کنید. نوار هر روز ظرفیت آن روز را نشان می‌دهد. «کپی به فردا» برنامه را تکرار می‌کند. با فلش‌ها بین هفته‌ها جابه‌جا شوید.'],
+    courses: ['درس‌ها', 'روی هر درس بزنید تا کتاب اضافه کنید. فقط دروس ترکیب‌های فعال اینجا هستند؛ ترکیب‌ها را از «بیشتر ← ترکیب‌ها» عوض کنید.'],
+    course: ['کتاب‌ها و جدول فصل‌ها', 'برای هر درس یک یا چند کتاب اضافه کنید. جدول پایین صفحه درصد و زمان همه‌ی فصل‌ها را در هر دور کنار هم نشان می‌دهد.'],
+    book: ['فصل‌های کتاب', 'با «ورود دسته‌ای» فهرست را یکجا بچسبانید: هر خط یک فصل، خطی که با فاصله شروع شود زیرفصل. با فلش‌ها ترتیب را عوض کنید و روی هر فصل بزنید تا جزئیاتش را ببینید.'],
+    chapter: ['صفحه‌ی فصل', '«شروع دور» یعنی یک بار کامل خواندن این فصل با زمان‌سنج و تست. هر بار که دوباره سراغ این فصل آمدید یک دور جدید بزنید تا نتیجه‌ها کنار هم مقایسه شوند. با دکمه‌ی ویرایش، اهمیت و زمان تخمینی را تعیین کنید.'],
+    study: ['مرحله‌ی مطالعه', 'زمان‌سنج را بزنید و بخوانید. اگر از اپ خارج شوید یا صفحه قفل شود، زمان درست می‌ماند. با «ویرایش دستی» می‌توانید زمان را اصلاح کنید.'],
+    test: ['مرحله‌ی تست', 'زمان‌سنج تست را بزنید و تست بزنید. بعد تعداد تست و تعداد صحیح را وارد کنید؛ اگر فقط درصد را دارید، «درصد» را انتخاب کنید.'],
+    result: ['نتیجه‌ی دور', 'وضعیت با آستانه‌های بخش تنظیمات تعیین می‌شود. اگر راضی نیستید «مطالعه‌ی مجدد و تست جدید» را بزنید؛ وگرنه دور را ببندید.'],
+    stats: ['آمار', 'پوشش فصل‌ها، زمان برنامه‌ریزی‌شده در برابر انجام‌شده، و ضعیف‌ترین فصل‌ها. روی هر ردیف بزنید تا به جزئیاتش بروید.'],
+    testcourse: ['درس فقط تست', 'این درس فصل ندارد. زمان‌سنج را بزنید، آزمون بدهید و نتیجه را ثبت کنید تا نمودار روند درصد ساخته شود.'],
+  };
+  function tip(key) {
+    if (!TIPS[key] || (S.settings.seenTips || {})[key]) return '';
+    const [t, b] = TIPS[key];
+    return '<div class="card" role="note" style="background:var(--acc-soft);border-color:var(--acc);margin:4px 0 14px"><div class="row" style="align-items:flex-start;color:var(--acc)">' + BULB + '<div class="grow"><b>' + t + '</b><p class="small" style="margin:4px 0 0;color:var(--ink)">' + b + '</p></div></div><div class="row" style="justify-content:flex-end;margin-top:6px"><button class="btn sm ghost" data-a="tipDone" data-v="' + key + '">متوجه شدم</button></div></div>';
+  }
+  function checklist() {
+    if (S.settings.checklistHidden) return '';
+    const anyTests = S.rounds.some((r) => r.tests.length);
+    const twoRounds = live(S.chapters).some((ch) => chapterRounds(ch.id).filter((r) => r.tests.length).length >= 2);
+    const items = [
+      ['کتاب و فصل‌ها را وارد کنید', live(S.chapters).length > 0, 'tab', 'courses', 'درس‌ها'],
+      ['برای امروز یا این هفته برنامه بریزید', S.plans.length > 0, 'planForm', todayKey(), 'افزودن'],
+      ['اولین دور را کامل کنید: مطالعه و تست', anyTests, 'tab', 'courses', 'شروع'],
+      ['یک فصل را برای بار دوم بخوانید و مقایسه کنید', twoRounds, null, null, null],
+      ['اولین فایل پشتیبان را بگیرید', !!S.settings.lastBackupAt, 'goMore', 'backup', 'پشتیبان'],
+    ];
+    const done = items.filter((x) => x[1]).length; if (done === items.length) return '';
+    return '<div class="card" style="margin-top:14px"><div class="row between"><b>شروع کار با پارامیس تک</b><button class="btn ghost sm" data-a="hideChecklist">بستن</button></div><div class="small muted">' + fa(done) + ' از ' + fa(items.length) + ' انجام شد</div><div style="margin:8px 0 4px">' + bar(done, items.length) + '</div>' +
+      items.map(([t, ok, a, v, l]) => '<div class="row" style="min-height:44px;border-top:1px solid var(--line)"><span class="chip ' + (ok ? 'ok' : '') + '" style="width:26px;height:26px;padding:0;justify-content:center" aria-label="' + (ok ? 'انجام شده' : 'انجام نشده') + '">' + (ok ? '✓' : faD(items.findIndex((x) => x[0] === t) + 1)) + '</span><span class="grow small" style="' + (ok ? 'text-decoration:line-through;color:var(--muted)' : '') + '">' + t + '</span>' + (!ok && a ? '<button class="btn sm" data-a="' + a + '" data-v="' + v + '">' + l + '</button>' : '') + '</div>').join('') + '</div>';
+  }
+  function vHelp() {
+    const s = S.settings; const n = s.testCount; const m = Math.ceil(n * s.masteryPct / 100), r = Math.ceil(n * s.reviewPct / 100);
+    const Q = [
+      ['شروع سریع', '۱) در «درس‌ها» برای هر درس کتاب بسازید و فهرست فصل‌ها را بچسبانید. ۲) در «برنامه» برای روزها فصل و زمان هدف بگذارید. ۳) در «امروز» روی «شروع دور» بزنید. ۴) بعد از چند دور، در صفحه‌ی هر فصل پیشرفت را ببینید.'],
+      ['دور چیست؟', 'هر بار که یک فصل را از اول تا آخر می‌خوانید و تست می‌زنید یک «دور» است. دور ۱ اولین مطالعه است و دورهای بعدی مرور. داده‌ی هر دور جدا ذخیره می‌شود و دورهای قبلی هرگز تغییر نمی‌کنند.'],
+      ['چرخه‌ی داخل دور', 'اگر نتیجه‌ی تست راضی‌کننده نبود، «مطالعه‌ی مجدد و تست جدید» در همان دور یک چرخه‌ی دیگر می‌سازد. در مقایسه‌ی دورها، درصد آخرین تست هر دور ملاک است.'],
+      ['زمان‌سنج', 'زمان‌سنج بر اساس ساعت شروع کار می‌کند، پس با بستن اپ یا قفل شدن صفحه دقیق می‌ماند. هم‌زمان فقط یک زمان‌سنج فعال است. «مکث» و «ویرایش دستی» برای وقفه‌ها و اصلاح زمان است.'],
+      ['ثبت سریع', 'اگر بدون زمان‌سنج مطالعه یا تست زده‌اید، در صفحه‌ی فصل یا کارت برنامه «ثبت سریع» را بزنید: زمان مطالعه، زمان تست، تعداد تست و تعداد صحیح یا درصد.'],
+      ['برنامه و ظرفیت', 'ساعت مفید هر روز هفته را در تنظیمات وارد کنید. مجموع زمان هدف برنامه‌ی هر روز با آن مقایسه می‌شود. پیشرفت هر مورد برنامه از زمان و تست‌های واقعی همان روز همان فصل حساب می‌شود.'],
+      ['وضعیت‌ها', 'با تنظیمات فعلی برای ' + fa(n) + ' تست: ' + fa(m) + ' صحیح و بیشتر «تسلط مطلوب»، ' + fa(r) + ' تا ' + fa(m - 1) + ' «مرور هدفمند»، کمتر از ' + fa(r) + ' «تکرار چرخه». آستانه‌ها از تنظیمات قابل تغییرند.'],
+      ['قاعده‌ی پیشرفت', 'کم شدن زمان مطالعه فقط وقتی «پیشرفت» علامت می‌خورد که درصد صحیح حفظ یا بیشتر شده باشد. زمان کمتر با افت درصد با برچسب «زمان کمتر ولی افت درصد» نمایش داده می‌شود.'],
+      ['نمره منفی', 'اگر در تنظیمات روشن شود، هنگام ثبت تست فیلد «غلط» هم اضافه می‌شود و درصد با کسر نمره‌ی منفی (مثلاً هر ۳ غلط یک صحیح) محاسبه می‌شود.'],
+      ['اولویت و حذف از برنامه', 'در ویرایش فصل، اولویت را بالا، متوسط، پایین یا «حذف از برنامه» بگذارید. فصل حذف‌شده از برنامه پاک نمی‌شود و با تغییر اولویت برمی‌گردد. حذف واقعی به سطل بازیافت می‌رود و تا ۳۰ روز قابل بازگرداندن است.'],
+      ['پشتیبان و انتقال', 'در «بیشتر ← پشتیبان» فایل JSON بگیرید و در جای امنی نگه دارید. روی گوشی یا مرورگر دیگر، همان فایل را از «بازیابی» وارد کنید.'],
+    ];
+    return top('راهنما') + '<div class="list">' + Q.map(([q, a], i) => '<details class="card"' + (i === 0 ? ' open' : '') + '><summary>' + q + '</summary><p class="small" style="margin:8px 0 0">' + a + '</p></details>').join('') + '</div>' +
+      '<div class="list" style="margin-top:16px"><button class="btn block" data-a="replayIntro">دیدن دوباره‌ی معرفی</button><button class="btn block" style="margin-top:8px" data-a="resetTips">نمایش دوباره‌ی نکته‌های صفحه‌ها</button><button class="btn block" style="margin-top:8px" data-a="showChecklist">نمایش دوباره‌ی چک‌لیست شروع</button></div>';
+  }
+
   // ---------- TODAY ----------
   function vToday() {
     const tk = todayKey(); const days = L.daysBetween(tk, S.settings.examDate);
@@ -290,8 +369,10 @@
     const planned = plans.reduce((a, p) => a + (p.minutes || 0), 0);
     let h = '<div class="row between" style="margin-top:4px"><div><div class="small muted">' + fmtJ(tk, true) + ' ' + faD(L.keyToJalali(tk).jy) + '</div><h1 style="margin:0">امروز</h1></div>' +
       '<div style="text-align:left"><div class="count">' + (days >= 0 ? fa(days) : '—') + '</div><div class="small muted">' + (days > 0 ? 'روز تا آزمون' : days === 0 ? 'روز آزمون' : 'تاریخ آزمون گذشته') + '</div></div></div>';
+    h += checklist();
     if (S.timer) h += '<div style="margin-top:14px">' + runningCard() + '</div>';
-    h += '<div class="grid2" style="margin-top:12px"><div class="stat"><b>' + fmtDur(act.sec) + '</b><span>زمان امروز' + (cap ? ' از ' + fmtDur(cap * 60) : '') + '</span>' + (cap ? '<div style="margin-top:6px">' + bar(act.sec, cap * 60) + '</div>' : '') + '</div>' +
+    h += '<div style="margin-top:12px">' + tip('today') + '</div>';
+    h += '<div class="grid2"><div class="stat"><b>' + fmtDur(act.sec) + '</b><span>زمان امروز' + (cap ? ' از ' + fmtDur(cap * 60) : '') + '</span>' + (cap ? '<div style="margin-top:6px">' + bar(act.sec, cap * 60) + '</div>' : '') + '</div>' +
       '<div class="stat"><b>' + fa(act.tests.count) + ' تست</b><span>درصد صحیح: ' + pctTxt(act.tests.count ? L.pctRaw(act.tests.correct, act.tests.count) : null) + '</span></div></div>';
     h += '<div class="row between"><h2>برنامه‌ی امروز</h2><button class="btn sm" data-a="planForm" data-v="' + tk + '">افزودن</button></div>';
     if (plans.length) {
@@ -331,6 +412,7 @@
     let tp = 0, ta = 0;
     days.forEach((d) => { tp += dayPlans(d).reduce((a, p) => a + (p.minutes || 0) * 60, 0); ta += dayActual(d).sec; });
     let h = top('برنامه', 'هفته‌ی ' + fmtJ(days[0]) + ' تا ' + fmtJ(days[6]));
+    h += tip('plan');
     h += '<div class="row" style="margin-bottom:12px"><button class="iconbtn" data-a="week" data-v="-7" aria-label="هفته‌ی قبل">' + ICON.prev + '</button><button class="btn grow sm" data-a="week" data-v="0">این هفته</button><button class="iconbtn" data-a="week" data-v="7" aria-label="هفته‌ی بعد">' + ICON.next + '</button></div>';
     h += '<div class="grid2"><div class="stat"><b>' + fmtDur(tp) + '</b><span>برنامه‌ریزی‌شده</span></div><div class="stat"><b>' + fmtDur(ta) + '</b><span>انجام‌شده</span></div></div>';
     h += '<div class="list" style="margin-top:12px">' + days.map((d) => {
@@ -365,6 +447,7 @@
   function vCourses() {
     const vis = visibleCourses(); const hidden = S.courses.filter((c) => !c.deletedAt && !courseVisible(c)); const act = S.combos.filter((c) => c.active);
     let h = top('درس‌ها', 'ترکیب‌های فعال: ' + (act.length ? act.map((c) => faD(c.code)).join('، ') : 'هیچ'), '<button class="btn sm pri" data-a="courseForm">درس جدید</button>');
+    h += tip('courses');
     h += '<div class="list">' + vis.map((c) => {
       let sub, prog = '';
       if (c.type === 'test') { const ls = S.langLogs.filter((l) => l.courseId === c.id); const s = L.sumTests(ls); sub = 'فقط تست‌زنی · ' + fa(ls.length) + ' آزمون · ' + pctTxt(s.count ? L.pctRaw(s.correct, s.count) : null); }
@@ -379,7 +462,8 @@
     const c = byId(S.courses, p.id); if (!c || c.deletedAt) return top('درس پیدا نشد');
     let h = top(c.name, comboNames(c), '<button class="iconbtn" data-a="courseForm" data-id="' + c.id + '" aria-label="ویرایش درس">' + ICON.edit + '</button>');
     if (c.archived) h += '<div class="banner warn">این درس بایگانی است.</div>';
-    if (c.type === 'test') return h + testCourseBody(c);
+    if (c.type === 'test') return h + tip('testcourse') + testCourseBody(c);
+    h += tip('course');
     // chapter comparison for whole course
     const chs = courseChapters(c.id, true);
     h += '<div class="row between"><h2>کتاب‌ها</h2><button class="btn sm" data-a="bookForm" data-course="' + c.id + '">کتاب جدید</button></div>';
@@ -400,6 +484,7 @@
     const b = byId(S.books, p.id); if (!b || b.deletedAt) return top('کتاب پیدا نشد');
     const c = byId(S.courses, b.courseId); const chs = orderedChapters(b.id);
     let h = top(b.title, esc(c.name) + (b.author ? ' · ' + esc(b.author) : ''), '<button class="iconbtn" data-a="bookForm" data-id="' + b.id + '" aria-label="ویرایش کتاب">' + ICON.edit + '</button>');
+    h += tip('book');
     h += '<div class="row" style="margin:8px 0 12px"><button class="btn pri grow" data-a="batchForm" data-id="' + b.id + '">ورود دسته‌ای فصل‌ها</button><button class="btn grow" data-a="chapterForm" data-book="' + b.id + '">فصل تکی</button></div>';
     if (!chs.length) return h + '<div class="card empty">فهرست فصل‌ها را با «ورود دسته‌ای» بچسبانید.</div>';
     h += '<div class="card" style="padding:4px 12px">' + chs.map((ch) => {
@@ -420,7 +505,7 @@
     if (ch.importance) meta.push(chip('اهمیت ' + fa(ch.importance) + '/۵'));
     if (ch.pastTestCount != null) meta.push(chip(fa(ch.pastTestCount) + ' تست سال‌های قبل'));
     if (ch.estMinutes) meta.push(chip('تخمین ' + fa(ch.estMinutes) + ' دقیقه'));
-    h += '<div class="row wrapx" style="gap:6px">' + meta.join('') + '</div>';
+    h += '<div class="row wrapx" style="gap:6px">' + meta.join('') + '</div>' + '<div style="margin-top:12px">' + tip('chapter') + '</div>';
     if (hasKids(ch.id)) return h + '<div class="banner info" style="margin-top:12px">این فصل زیرفصل دارد؛ دورها و تست‌ها روی زیرفصل‌ها ثبت می‌شوند.</div>' + chapterMatrix(live(S.chapters).filter((x) => x.parentId === ch.id).sort((a, z) => a.order - z.order));
     if (ch.priority === 'excluded') h += '<div class="banner warn" style="margin-top:10px">این فصل از برنامه حذف شده. برای بازگرداندن، اولویت را تغییر دهید.</div>';
     const rs = chapterRounds(ch.id); const active = rs.find((r) => r.status === 'active');
@@ -455,7 +540,7 @@
     const ch = byId(S.chapters, r.chapterId); const c = chapterCourse(ch);
     const steps = [['study', 'مطالعه'], ['test', 'تست'], ['result', 'نتیجه']]; const idx = steps.findIndex(([k]) => k === r.step);
     let h = top(ch.title, esc(c.name) + ' · دور ' + fa(r.roundNumber) + (r.tests.length ? ' · چرخه‌ی ' + fa(r.cycle) : ''));
-    h += '<div class="steps">' + steps.map(([, l], i) => '<span class="' + (i === idx ? 'on' : i < idx ? 'done' : '') + '">' + faD(i + 1) + '. ' + l + '</span>').join('') + '</div><div style="margin-top:14px">';
+    h += '<div class="steps">' + steps.map(([, l], i) => '<span class="' + (i === idx ? 'on' : i < idx ? 'done' : '') + '">' + faD(i + 1) + '. ' + l + '</span>').join('') + '</div><div style="margin-top:14px">' + tip(r.step);
     if (r.step === 'study') {
       const cap = ch.estMinutes;
       h += timerBlock(r, 'study', cap ? 'زمان تخمینی این فصل: ' + fa(cap) + ' دقیقه' : '') + (timerFor(r.id, 'study') ? '<button class="btn pri block big" style="margin-top:12px" data-a="studyDone" data-id="' + r.id + '">پایان مطالعه، رفتن به تست</button>' : '<button class="btn block" style="margin-top:10px" data-a="skipStudy" data-id="' + r.id + '">بدون زمان‌سنج، مستقیم به تست</button>');
@@ -531,7 +616,7 @@
     const tk = todayKey(); const all = activeChapters(); const covered = all.filter((ch) => chapterRounds(ch.id).some((r) => r.status === 'done'));
     const second = all.filter((ch) => chapterRounds(ch.id).filter((r) => r.status === 'done').length >= 2);
     const totSec = S.sessions.reduce((a, s) => a + s.durationSec, 0); const allTests = []; S.rounds.forEach((r) => r.tests.forEach((t) => allTests.push(t))); S.langLogs.forEach((l) => allTests.push(l)); const ts = L.sumTests(allTests);
-    let h = top('آمار', fa(Math.max(0, L.daysBetween(tk, S.settings.examDate))) + ' روز تا آزمون');
+    let h = top('آمار', fa(Math.max(0, L.daysBetween(tk, S.settings.examDate))) + ' روز تا آزمون') + tip('stats');
     h += '<div class="grid2"><div class="stat"><b>' + fa(covered.length) + ' / ' + fa(all.length) + '</b><span>فصل با حداقل یک دور</span>' + (all.length ? '<div style="margin-top:6px">' + bar(covered.length, all.length) + '</div>' : '') + '</div><div class="stat"><b>' + fa(second.length) + '</b><span>فصل با دور دوم</span></div>' +
       '<div class="stat"><b>' + fmtDur(totSec) + '</b><span>کل زمان</span></div><div class="stat"><b>' + fa(ts.count) + '</b><span>کل تست · ' + pctTxt(ts.count ? L.pctRaw(ts.correct, ts.count) : null) + '</span></div></div>';
     // last 14 days: plan vs actual
@@ -574,7 +659,7 @@
 
   // ---------- MORE ----------
   function vMore() {
-    const items = [['settings', 'تنظیمات', 'تاریخ آزمون، ساعت مفید روزها، تعداد تست، آستانه‌ها، نمره منفی'], ['combos', 'ترکیب‌ها', 'فعال و غیرفعال‌کردن ترکیب‌ها'], ['backup', 'پشتیبان و بازیابی', 'خروجی و ورود فایل JSON'], ['bin', 'سطل بازیافت', 'بازگرداندن موارد حذف‌شده (۳۰ روز)'], ['audit', 'تاریخچه‌ی تغییرات', 'حذف‌ها و بازگردانی‌ها'], ['selftest', 'آزمون محاسبات', 'بررسی درستی محاسبه‌ها']];
+    const items = [['help', 'راهنما', 'آموزش بخش‌ها، معرفی اپ و چک‌لیست شروع'], ['settings', 'تنظیمات', 'تاریخ آزمون، ساعت مفید روزها، تعداد تست، آستانه‌ها، نمره منفی'], ['combos', 'ترکیب‌ها', 'فعال و غیرفعال‌کردن ترکیب‌ها'], ['backup', 'پشتیبان و بازیابی', 'خروجی و ورود فایل JSON'], ['bin', 'سطل بازیافت', 'بازگرداندن موارد حذف‌شده (۳۰ روز)'], ['audit', 'تاریخچه‌ی تغییرات', 'حذف‌ها و بازگردانی‌ها'], ['selftest', 'آزمون محاسبات', 'بررسی درستی محاسبه‌ها']];
     return top('بیشتر') + '<div class="card" id="syncbox">' + syncHtml() + '</div><div class="list" style="margin-top:12px">' + items.map(([k, t, s]) => '<button class="card tap" data-a="goMore" data-v="' + k + '"><b>' + t + '</b><div class="small muted">' + s + '</div></button>').join('') + '</div>';
   }
   function vSettings() {
@@ -670,6 +755,14 @@
     resumeTimer: () => { const t = S.timer; if (!t) return; if (t.roundId) go('session', { id: t.roundId }); else go('course', { id: t.courseId }); },
     obCombo: (el) => { byId(S.combos, el.dataset.id).active = el.checked; },
     obCourse: (el) => { byId(S.courses, el.dataset.id).archived = !el.checked; },
+    introNext: () => { if (introIdx < INTRO.length - 1) { introIdx++; render(); window.scrollTo(0, 0); return; } introIdx = 0; if (S.settings.onboarded) { back(); } else { S.settings.introDone = true; save(); render(); } },
+    introPrev: () => { if (introIdx > 0) { introIdx--; render(); } },
+    introSkip: () => { introIdx = 0; S.settings.introDone = true; save(); render(); },
+    replayIntro: () => { introIdx = 0; go('intro'); },
+    tipDone: (el) => { S.settings.seenTips = Object.assign({}, S.settings.seenTips, { [el.dataset.v]: true }); save(); const card = el.closest('[role=note]'); if (card) card.remove(); },
+    resetTips: () => { S.settings.seenTips = {}; save(); toast('نکته‌ها دوباره در صفحه‌ها نمایش داده می‌شوند'); },
+    hideChecklist: () => { S.settings.checklistHidden = true; save(); render(); toast('از «بیشتر ← راهنما» می‌توانید دوباره نمایشش دهید'); },
+    showChecklist: () => { S.settings.checklistHidden = false; save(); setTab('today'); },
     obNext: () => { ob.err = ''; ob.step++; render(); }, obPrev: () => { ob.err = ''; ob.step--; render(); }, obFinish: () => finishOnboarding(),
     // plan
     week: (el) => { const d = Number(el.dataset.v); planWeek = d === 0 ? weekStart(todayKey()) : addDays(planWeek, d); render(); },
@@ -904,6 +997,7 @@
     try {
       NB.App.addListener('backButton', () => {
         if ($('#sheetbg')) return closeSheet();
+        if (!S.settings.onboarded && !S.settings.introDone) { if (introIdx > 0) { introIdx--; render(); } else NB.App.minimizeApp(); return; }
         if (!S.settings.onboarded) { if (ob && ob.step > 0) { ob.step--; render(); } else NB.App.minimizeApp(); return; }
         if (nav.stack.length) return back();
         if (nav.tab !== 'today') return setTab('today');
