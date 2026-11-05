@@ -154,3 +154,7 @@ details.card[open]>summary::after{content:'−'}
 .kv{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
 .kv:last-child{border-bottom:0}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.chap .mv .playb{width:40px;height:40px;border-radius:50%;background:var(--acc-soft);color:var(--acc);margin-left:4px}
+.chap .mv .playb.on{background:var(--acc-2);color:#1B1B1B}
+.chap .mv .playb svg{width:18px;height:18px}
+.btn.finish{background:var(--ok-soft);color:var(--ok);box-shadow:none}

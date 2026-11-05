@@ -175,7 +175,8 @@
   function roundStatus(r) { const t = r.tests[r.tests.length - 1]; if (!t) return null; return L.masteryStatus(L.pctRaw(t.correct, t.count), S.settings.masteryPct, S.settings.reviewPct); }
   function chapterState(ch) {
     const rs = chapterRounds(ch.id);
-    if (rs.some((r) => r.status === 'active')) return { key: 'active', label: 'دور باز', cls: 'acc' };
+    const ar = rs.find((r) => r.status === 'active');
+    if (ar) { if (ar.step === 'study') { const sec = roundSessions(ar.id).filter((x) => isStudy(x) && (x.cycle || 1) === (ar.cycle || 1)).reduce((a, x) => a + x.durationSec, 0); return { key: 'active', label: sec ? 'نیمه‌کاره · ' + fmtDur(sec) : 'دور باز', cls: 'acc' }; } return { key: 'active', label: ar.step === 'test' ? 'نوبت تست' : 'دور باز', cls: 'acc' }; }
     const done = rs.filter((r) => r.status === 'done'); if (!done.length) return { key: 'new', label: 'شروع‌نشده', cls: '' };
     const st = roundStatus(done[done.length - 1]);
     if (st === 'mastered') return { key: 'mastered', label: 'تسلط · دور ' + fa(done.length), cls: 'ok' };
@@ -353,8 +354,8 @@
     courses: ['درس‌ها', 'روی هر درس بزنید تا کتاب اضافه کنید. با دکمه‌ی ⋮ کنار هر درس، آن را ویرایش، جابه‌جا، بایگانی یا حذف کنید.'],
     course: ['کتاب‌ها و جدول فصل‌ها', 'برای هر درس یک یا چند کتاب اضافه کنید. جدول پایین صفحه درصد و زمان همه‌ی فصل‌ها را در هر دور کنار هم نشان می‌دهد.'],
     book: ['فصل‌های کتاب', 'با «ورود دسته‌ای» فهرست را یکجا بچسبانید: هر خط یک فصل، خطی که با فاصله شروع شود زیرفصل. با فلش‌ها ترتیب را عوض کنید. دکمه‌ی ⋮ هر فصل برای ویرایش، حذف از برنامه یا حذف است.'],
-    chapter: ['صفحه‌ی فصل', '«شروع دور» یعنی یک بار کامل خواندن این فصل با زمان‌سنج و تست. هر بار که دوباره سراغ این فصل آمدید یک دور جدید بزنید تا نتیجه‌ها کنار هم مقایسه شوند. با دکمه‌ی ویرایش، اهمیت و زمان تخمینی را تعیین کنید.'],
-    study: ['مرحله‌ی مطالعه', 'زمان‌سنج را بزنید و بخوانید. اگر از اپ خارج شوید یا صفحه قفل شود، زمان درست می‌ماند. با «ویرایش دستی» می‌توانید زمان را اصلاح کنید.'],
+    chapter: ['صفحه‌ی فصل', '«شروع مطالعه» زمان‌سنج را روشن می‌کند؛ می‌توانید چند جلسه بخوانید و در آخر «اتمام فصل» را بزنید. «ثبت دستی زمان» برای وقتی است که بدون زمان‌سنج خوانده‌اید. هر بار مرور کامل یک فصل یک «دور» است؛ «شروع دور» یعنی یک بار کامل خواندن این فصل با زمان‌سنج و تست. هر بار که دوباره سراغ این فصل آمدید یک دور جدید بزنید تا نتیجه‌ها کنار هم مقایسه شوند. با دکمه‌ی ویرایش، اهمیت و زمان تخمینی را تعیین کنید.'],
+    study: ['مرحله‌ی مطالعه', 'لازم نیست فصل را یک‌جا تمام کنید. «پایان این جلسه» زمان را ثبت می‌کند و فصل باز می‌ماند؛ هر وقت برگشتید «ادامه‌ی مطالعه» را بزنید. وقتی فصل تمام شد «اتمام فصل» را بزنید تا به تست بروید. بدون زمان‌سنج خواندید؟ «ثبت دستی زمان».'],
     test: ['مرحله‌ی تست', 'زمان‌سنج تست را بزنید و تست بزنید. بعد تعداد تست و تعداد صحیح را وارد کنید؛ اگر فقط درصد را دارید، «درصد» را انتخاب کنید.'],
     result: ['نتیجه‌ی دور', 'وضعیت با آستانه‌های بخش تنظیمات تعیین می‌شود. اگر راضی نیستید «مطالعه‌ی مجدد و تست جدید» را بزنید؛ وگرنه دور را ببندید.'],
     stats: ['آمار', 'پوشش فصل‌ها، زمان برنامه‌ریزی‌شده در برابر انجام‌شده، و ضعیف‌ترین فصل‌ها. روی هر ردیف بزنید تا به جزئیاتش بروید.'],
@@ -435,7 +436,7 @@
     const prog = p.minutes ? a.sec / (p.minutes * 60) : p.tests ? a.tests.count / p.tests : 0;
     return '<div class="card' + (done ? '' : '') + '"><div class="row"><span class="dot" style="background:' + esc(lb.color) + '"></span><div class="grow" style="min-width:0"><b>' + esc(lb.title) + '</b><div class="small muted">' + esc(lb.sub) + '</div></div>' + (done ? chip('انجام شد', 'ok') : '') + '</div>' +
       '<div class="row between small" style="margin-top:8px;gap:12px;flex-wrap:wrap">' + parts.join('<span class="muted">·</span>') + '</div><div style="margin-top:6px">' + bar(prog, 1, done ? 'var(--ok)' : null) + '</div>' +
-      '<div class="row" style="margin-top:10px"><button class="btn pri sm grow" data-a="planGo" data-id="' + p.id + '">' + (p.chapterId ? (activeRound(p.chapterId) ? 'ادامه‌ی دور' : 'شروع دور') : 'شروع آزمون') + '</button>' + (p.chapterId ? '<button class="btn sm grow" data-a="quickForm" data-id="' + p.chapterId + '">ثبت سریع</button>' : '') + '<button class="iconbtn" data-a="planForm" data-id="' + p.id + '" aria-label="ویرایش برنامه">' + ICON.edit + '</button></div></div>';
+      '<div class="row" style="margin-top:10px"><button class="btn pri sm grow" data-a="planGo" data-id="' + p.id + '">' + (p.chapterId ? (timerForChapter(p.chapterId) ? 'رفتن به جلسه' : studyLabel(p.chapterId)) : 'شروع آزمون') + '</button>' + (p.chapterId ? '<button class="btn sm grow" data-a="quickForm" data-id="' + p.chapterId + '">ثبت سریع</button>' : '') + '<button class="iconbtn" data-a="planForm" data-id="' + p.id + '" aria-label="ویرایش برنامه">' + ICON.edit + '</button></div></div>';
   }
   const activeRound = (chId) => S.rounds.find((r) => r.chapterId === chId && r.status === 'active');
   function backupDue() { const lb = S.settings.lastBackupAt; if (!S.sessions.length) return false; const ref = lb ? new Date(lb).getTime() : new Date(S.sessions[0].startedAt).getTime(); return Date.now() - ref > 7 * 86400000; }
@@ -528,7 +529,7 @@
       const sibs = live(S.chapters).filter((x) => x.bookId === b.id && (x.parentId || null) === (ch.parentId || null)).sort((a, z) => a.order - z.order);
       const i = sibs.findIndex((x) => x.id === ch.id); const st = chapterState(ch); const rs = chapterRounds(ch.id).filter((r) => r.tests.length); const last = rs[rs.length - 1];
       return '<div class="chap ' + (ch.parentId ? 'sub ' : '') + (ch.priority === 'excluded' ? 'excluded' : '') + '"><div class="t" data-a="openChapter" data-id="' + ch.id + '" role="button" tabindex="0"><span>' + esc(ch.title) + '</span><span class="small muted">' + (hasKids(ch.id) ? 'دارای زیرفصل' : ch.priority === 'excluded' ? 'حذف از برنامه' : st.label + (last ? ' · ' + pctTxt(roundSummary(last).pct) : '')) + '</span></div>' +
-        '<div class="mv"><button data-a="moveCh" data-id="' + ch.id + '" data-v="-1" aria-label="بالا" ' + (i === 0 ? 'disabled' : '') + '>' + ICON.up + '</button><button data-a="moveCh" data-id="' + ch.id + '" data-v="1" aria-label="پایین" ' + (i === sibs.length - 1 ? 'disabled' : '') + '>' + ICON.down + '</button><button data-a="chapterMenu" data-id="' + ch.id + '" aria-label="گزینه‌های ' + esc(ch.title) + '">' + DOTS + '</button></div></div>';
+        '<div class="mv">' + (!hasKids(ch.id) && ch.priority !== 'excluded' ? '<button class="playb' + (timerForChapter(ch.id) ? ' on' : '') + '" data-a="studyFromList" data-id="' + ch.id + '" aria-label="' + studyLabel(ch.id) + ' ' + esc(ch.title) + '">' + (timerForChapter(ch.id) ? SVG('<rect x="7" y="6" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="13.5" y="6" width="3.5" height="12" rx="1" fill="currentColor"/>') : SVG('<path d="M8 5v14l11-7z" fill="currentColor"/>')) + '</button>' : '') + '<button data-a="moveCh" data-id="' + ch.id + '" data-v="-1" aria-label="بالا" ' + (i === 0 ? 'disabled' : '') + '>' + ICON.up + '</button><button data-a="moveCh" data-id="' + ch.id + '" data-v="1" aria-label="پایین" ' + (i === sibs.length - 1 ? 'disabled' : '') + '>' + ICON.down + '</button><button data-a="chapterMenu" data-id="' + ch.id + '" aria-label="گزینه‌های ' + esc(ch.title) + '">' + DOTS + '</button></div></div>';
     }).join('') + '</div>';
     return h;
   }
@@ -546,7 +547,7 @@
     if (hasKids(ch.id)) return h + '<div class="banner info" style="margin-top:12px">این فصل زیرفصل دارد؛ دورها و تست‌ها روی زیرفصل‌ها ثبت می‌شوند.</div>' + chapterMatrix(live(S.chapters).filter((x) => x.parentId === ch.id).sort((a, z) => a.order - z.order));
     if (ch.priority === 'excluded') h += '<div class="banner warn" style="margin-top:10px">این فصل از برنامه حذف شده. برای بازگرداندن، اولویت را تغییر دهید.</div>';
     const rs = chapterRounds(ch.id); const active = rs.find((r) => r.status === 'active');
-    h += '<div class="row" style="margin-top:14px">' + (active ? '<button class="btn pri big grow" data-a="openSession" data-id="' + active.id + '">ادامه‌ی دور ' + fa(active.roundNumber) + '</button>' : '<button class="btn pri big grow" data-a="startRound" data-id="' + ch.id + '" ' + (ch.priority === 'excluded' ? 'disabled' : '') + '>شروع دور ' + fa(rs.length + 1) + '</button>') + '<button class="btn big grow" data-a="quickForm" data-id="' + ch.id + '">ثبت سریع</button></div>';
+    h += chapterActions(ch, active, rs);
     h += '<button class="btn ghost block" data-a="planForm" data-v="' + todayKey() + '" data-ch="' + ch.id + '">افزودن به برنامه‌ی امروز</button>';
     const done = rs.filter((r) => r.tests.length || r.status === 'done');
     if (!done.length) return h + '<div class="card empty" style="margin-top:12px">هنوز دوری ثبت نشده. با «شروع دور» زمان مطالعه و تست را بسنجید، یا با «ثبت سریع» نتیجه را وارد کنید.</div>';
@@ -571,6 +572,19 @@
     return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block" role="img" aria-label="زمان مطالعه و درصد صحیح در هر دور">' + g + '</svg><div class="row small muted" style="gap:14px;justify-content:center"><span><span class="dot" style="background:var(--soft);border:1px solid var(--line)"></span> زمان مطالعه</span><span><span class="dot" style="background:var(--acc)"></span> درصد صحیح</span></div>';
   }
 
+  function chapterActions(ch, active, rs) {
+    const dis = ch.priority === 'excluded' ? 'disabled' : '';
+    const studied = active ? roundSessions(active.id).filter((x) => isStudy(x) && (x.cycle || 1) === (active.cycle || 1)).reduce((a, x) => a + x.durationSec, 0) : 0;
+    let h = '<div class="card" style="margin-top:14px">';
+    if (active) h += '<div class="row between"><b>دور ' + fa(active.roundNumber) + (active.cycle > 1 ? ' · چرخه‌ی ' + fa(active.cycle) : '') + '</b>' + chip(active.step === 'study' ? (studied ? 'مطالعه نیمه‌کاره · ' + fmtDur(studied) : 'آماده‌ی مطالعه') : active.step === 'test' ? 'مطالعه تمام شد · نوبت تست' : 'نتیجه ثبت شد', 'acc') + '</div>';
+    else h += '<div class="small muted">دور ' + fa(rs.length + 1) + ' هنوز شروع نشده</div>';
+    const running = timerForChapter(ch.id);
+    h += '<div class="row" style="margin-top:10px"><button class="btn pri big grow" data-a="studyFromList" data-id="' + ch.id + '" ' + dis + '>' + (running ? 'رفتن به جلسه' : studyLabel(ch.id)) + '</button>' +
+      (active && active.step === 'study' ? '<button class="btn big grow finish" data-a="finishFromList" data-id="' + ch.id + '">اتمام فصل</button>' : '') + '</div>';
+    h += '<div class="row" style="margin-top:8px"><button class="btn sm grow" data-a="manualStudyCh" data-id="' + ch.id + '" ' + dis + '>ثبت دستی زمان</button><button class="btn sm grow" data-a="quickForm" data-id="' + ch.id + '" ' + dis + '>ثبت سریع نتیجه</button>' + (active ? '<button class="btn sm grow" data-a="openSession" data-id="' + active.id + '">جزئیات دور</button>' : '') + '</div></div>';
+    return h;
+  }
+
   // ---------- SESSION (round: study → test → result) ----------
   function vSession(p) {
     const r = byId(S.rounds, p.id); if (!r) return top('دور پیدا نشد');
@@ -579,12 +593,26 @@
     let h = top(ch.title, esc(c.name) + ' · دور ' + fa(r.roundNumber) + (r.tests.length ? ' · چرخه‌ی ' + fa(r.cycle) : ''));
     h += '<div class="steps">' + steps.map(([, l], i) => '<span class="' + (i === idx ? 'on' : i < idx ? 'done' : '') + '">' + faD(i + 1) + '. ' + l + '</span>').join('') + '</div><div style="margin-top:14px">' + tip(r.step);
     if (r.step === 'study') {
-      const cap = ch.estMinutes;
-      h += timerBlock(r, 'study', cap ? 'زمان تخمینی این فصل: ' + fa(cap) + ' دقیقه' : '') + (timerFor(r.id, 'study') ? '<button class="btn pri block big" style="margin-top:12px" data-a="studyDone" data-id="' + r.id + '">پایان مطالعه، رفتن به تست</button>' : '<button class="btn block" style="margin-top:10px" data-a="skipStudy" data-id="' + r.id + '">بدون زمان‌سنج، مستقیم به تست</button>');
+      h += studyStep(r, ch);
     } else if (r.step === 'test') h += testStep(r);
     else h += resultStep(r, ch);
     h += '</div>';
     if (r.step !== 'result') h += '<button class="btn ghost block" style="margin-top:20px" data-a="closeRound" data-id="' + r.id + '">بستن دور</button>';
+    return h;
+  }
+  function studyStep(r, ch) {
+    const t = timerFor(r.id, 'study'); const other = S.timer && !t;
+    const ss = roundSessions(r.id).filter((x) => isStudy(x) && (x.cycle || 1) === (r.cycle || 1)).sort((a, b) => (a.startedAt < b.startedAt ? -1 : 1));
+    const done = ss.reduce((a, x) => a + x.durationSec, 0); const live = t ? Math.round(tElapsed() / 1000) : 0; const cap = ch.estMinutes;
+    let h = '<div class="card" style="text-align:center"><div class="small muted">' + (t ? (t.running ? 'در حال مطالعه' : 'مکث') : (ss.length ? 'مطالعه‌ی این فصل نیمه‌کاره است' : 'مطالعه‌ی این فصل هنوز شروع نشده')) + '</div>' +
+      '<div class="timer" ' + (t ? 'data-timer' : '') + '>' + fmtClock(t ? tElapsed() : 0) + '</div><div id="capwarn"></div>' +
+      '<div class="small muted">مجموع مطالعه‌ی این دور: <b class="num" style="color:var(--ink)" data-total="' + done + '">' + fmtDur(done + live) + '</b>' + (cap ? ' از ' + fa(cap) + ' دقیقه‌ی تخمینی' : '') + ' · ' + fa(ss.length) + ' جلسه</div>' + (cap ? '<div style="margin-top:8px">' + bar(done + live, cap * 60) + '</div>' : '') + '</div>';
+    if (other) h += '<div class="banner warn" style="margin-top:10px">یک زمان‌سنج دیگر در جریان است. <button class="btn sm" data-a="resumeTimer">رفتن به آن</button></div>';
+    else if (!t) h += '<div class="row" style="margin-top:12px"><button class="btn pri big grow" data-a="studyStart" data-id="' + r.id + '">' + (ss.length ? 'ادامه‌ی مطالعه' : 'شروع مطالعه') + '</button><button class="btn big grow" data-a="manualStudy" data-id="' + r.id + '">ثبت دستی زمان</button></div>';
+    else h += '<div class="row" style="margin-top:12px">' + (t.running ? '<button class="btn grow" data-a="tPause">مکث</button>' : '<button class="btn grow" data-a="tResume">ادامه</button>') + '<button class="btn grow" data-a="tEdit">اصلاح زمان</button></div>' +
+      '<button class="btn pri block big" style="margin-top:10px" data-a="studyStop" data-id="' + r.id + '">پایان این جلسه (فصل تمام نشده)</button>';
+    h += '<button class="btn block big finish" style="margin-top:10px" data-a="finishChapter" data-id="' + r.id + '" ' + (other ? 'disabled' : '') + '>اتمام فصل و رفتن به تست</button>';
+    if (ss.length) h += '<h3 style="margin-top:18px">جلسه‌های مطالعه‌ی این دور</h3><div class="card" style="margin-top:8px;padding:4px 14px">' + ss.map((x) => '<div class="kv"><span>' + fmtJIso(x.startedAt) + (x.manualEdit ? ' <span class="small muted">· دستی</span>' : '') + '</span><span class="row" style="gap:4px"><span class="num">' + fmtDur(x.durationSec) + '</span><button class="iconbtn ghosti" style="width:40px;height:40px" data-a="delSession" data-id="' + x.id + '" aria-label="حذف این جلسه">×</button></span></div>').join('') + '</div>';
     return h;
   }
   function timerBlock(r, step, hint) {
@@ -831,7 +859,7 @@
     planForm: (el) => { planForm(el.dataset.id, el.dataset.v); if (el.dataset.ch) { const f = $('.sheet form'); const ch = byId(S.chapters, el.dataset.ch); const c = chapterCourse(ch); f.courseId.value = c.id; $('#chapsel').innerHTML = chapterSelect(c.id, ch.id); } },
     planGoS: (el) => { closeSheet(true); A.planGo(el); },
     tabS: (el) => { closeSheet(true); setTab(el.dataset.v); },
-    planGo: (el) => { const p = byId(S.plans, el.dataset.id); if (!p.chapterId) return go('course', { id: p.courseId }); const r = activeRound(p.chapterId); if (r) return go('session', { id: r.id }); startRound(p.chapterId); },
+    planGo: (el) => { const p = byId(S.plans, el.dataset.id); if (!p.chapterId) return go('course', { id: p.courseId }); startStudy(p.chapterId); },
     delPlan: (el) => { S.plans = S.plans.filter((p) => p.id !== el.dataset.id); save(); closeSheet(); render(); toast('از برنامه حذف شد'); },
     copyPlan: (el) => { const from = el.dataset.v, to = el.dataset.to; const src = dayPlans(from); const have = S.plans.filter((p) => p.date === to); let n = 0; src.forEach((p) => { if (have.some((h) => h.courseId === p.courseId && h.chapterId === p.chapterId)) return; S.plans.push({ id: uid(), date: to, courseId: p.courseId, chapterId: p.chapterId, minutes: p.minutes, tests: p.tests, order: have.length + n, createdAt: nowIso() }); n++; }); save(); render(); toast(n ? fa(n) + ' مورد به ' + fmtJ(to, true) + ' کپی شد' : 'همه‌ی موارد از قبل در آن روز هست'); },
     // structure
@@ -855,8 +883,17 @@
     tStart: (el) => { if (S.timer) return toast('یک زمان‌سنج دیگر در جریان است'); startTimer({ roundId: el.dataset.id, step: el.dataset.v }); render(); },
     tPause: () => { pauseTimer(); render(); }, tResume: () => { resumeTimer(); render(); },
     tEdit: () => { sheet('<h2 style="margin-top:0">ویرایش دستی زمان</h2><form data-form="tEdit">' + num('min', 'مدت (دقیقه)', Math.round(tElapsed() / 60000)) + '<div id="formerr" class="err" role="alert"></div><button class="btn pri block" style="margin-top:14px">ثبت</button></form>'); },
-    studyDone: (el) => { const r = byId(S.rounds, el.dataset.id); const res = stopTimer(); if (res) logSession({ roundId: r.id, chapterId: r.chapterId, courseId: r.courseId, step: 'study', startedAt: res.firstStart, endedAt: nowIso(), durationSec: res.sec, manualEdit: res.manual }); r.step = 'test'; save(); render(); window.scrollTo(0, 0); },
+    studyDone: (el) => { const r = byId(S.rounds, el.dataset.id); const res = stopTimer(); if (res) logSession({ roundId: r.id, chapterId: r.chapterId, courseId: r.courseId, step: 'study', cycle: r.cycle, startedAt: res.firstStart, endedAt: nowIso(), durationSec: res.sec, manualEdit: res.manual }); r.step = 'test'; save(); render(); window.scrollTo(0, 0); },
     skipStudy: (el) => { const r = byId(S.rounds, el.dataset.id); r.step = 'test'; save(); render(); },
+    studyStart: (el) => { if (S.timer) return toast('یک زمان‌سنج دیگر در جریان است'); startTimer({ roundId: el.dataset.id, step: 'study' }); render(); },
+    studyStop: (el) => { const r = byId(S.rounds, el.dataset.id); const res = stopTimer(); if (res && res.sec > 0) logSession({ roundId: r.id, chapterId: r.chapterId, courseId: r.courseId, step: 'study', cycle: r.cycle, startedAt: res.firstStart, endedAt: nowIso(), durationSec: res.sec, manualEdit: res.manual }); save(); render(); toast('جلسه ثبت شد: ' + fmtDur(res ? res.sec : 0) + '. هر وقت خواستید ادامه دهید.'); },
+    finishChapter: (el) => { const r = byId(S.rounds, el.dataset.id); if (timerFor(r.id, 'study')) { const res = stopTimer(); if (res.sec > 0) logSession({ roundId: r.id, chapterId: r.chapterId, courseId: r.courseId, step: 'study', cycle: r.cycle, startedAt: res.firstStart, endedAt: nowIso(), durationSec: res.sec, manualEdit: res.manual }); } r.step = 'test'; r.readDoneAt = nowIso(); save(); render(); window.scrollTo(0, 0); toast('مطالعه‌ی فصل تمام شد؛ حالا تست'); },
+    manualStudy: (el) => manualStudyForm(el.dataset.id),
+    manualStudyCh: (el) => { const r = ensureStudyRound(el.dataset.id); if (r) manualStudyForm(r.id, true); },
+    studyFromList: (el) => startStudy(el.dataset.id),
+    finishFromList: (el) => { const r = activeRound(el.dataset.id); if (!r) return; A.finishChapter({ dataset: { id: r.id } }); go('session', { id: r.id }); },
+    delSession: (el) => { const x = byId(S.sessions, el.dataset.id); confirmSheet('حذف این جلسه؟', fmtDur(x.durationSec) + ' مطالعه در ' + fmtJIso(x.startedAt) + ' حذف می‌شود.', 'حذف', () => { S.sessions = S.sessions.filter((y) => y !== x); save(); render(); toast('جلسه حذف شد', () => { S.sessions.push(x); }); }, true); },
+    mDay: (el) => { const f = el.closest('form'); f.day.value = el.dataset.v; el.parentNode.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b === el)); },
     again: (el) => { const r = byId(S.rounds, el.dataset.id); r.cycle++; r.step = 'study'; save(); render(); window.scrollTo(0, 0); },
     closeRound: (el) => closeRound(byId(S.rounds, el.dataset.id)),
     reopenRound: (el) => { const r = byId(S.rounds, el.dataset.id); if (activeRound(r.chapterId)) return toast('این فصل یک دور باز دیگر دارد'); closeSheet(true); r.status = 'active'; r.step = r.tests.length ? 'result' : 'study'; save(); go('session', { id: r.id }); },
@@ -882,6 +919,30 @@
     copyJson: async () => { try { await navigator.clipboard.writeText(JSON.stringify(S)); S.settings.lastBackupAt = nowIso(); save(); toast('متن پشتیبان کپی شد'); render(); } catch (e) { sheet('<h2 style="margin-top:0">متن پشتیبان</h2><p class="small muted">کپی خودکار ممکن نشد. متن زیر را انتخاب و کپی کنید.</p><textarea readonly style="min-height:240px;direction:ltr;font-size:11px">' + esc(JSON.stringify(S)) + '</textarea>'); } },
     importPaste: () => tryImport($('#pastebox').value),
   };
+  function ensureStudyRound(chId) {
+    const ch = byId(S.chapters, chId); const c = chapterCourse(ch); let r = activeRound(chId);
+    if (!r) { r = { id: uid(), chapterId: ch.id, courseId: c.id, roundNumber: chapterRounds(ch.id).length + 1, startDate: todayKey(), endDate: null, status: 'active', step: 'study', cycle: 1, tests: [], createdAt: nowIso() }; S.rounds.push(r); }
+    else if (r.step === 'result') { r.cycle++; r.step = 'study'; }
+    else if (r.step === 'test') r.step = 'study';
+    return r;
+  }
+  function timerForChapter(chId) { const t = S.timer; if (!t || !t.roundId) return null; const r = byId(S.rounds, t.roundId); return r && r.chapterId === chId ? t : null; }
+  function studyLabel(chId) { const r = activeRound(chId); if (!r) return 'شروع مطالعه'; if (r.step === 'study') return roundSessions(r.id).some(isStudy) ? 'ادامه‌ی مطالعه' : 'شروع مطالعه'; return r.step === 'test' ? 'رفتن به تست' : 'دیدن نتیجه'; }
+  function startStudy(chId) {
+    if (timerForChapter(chId)) return go('session', { id: S.timer.roundId });
+    const cur0 = activeRound(chId);
+    if (cur0 && cur0.step !== 'study') return go('session', { id: cur0.id });
+    if (S.timer) { toast('یک زمان‌سنج دیگر در جریان است؛ اول آن را تمام کنید'); return A.resumeTimer(); }
+    const r = ensureStudyRound(chId); startTimer({ roundId: r.id, step: 'study' }); closeSheet(true); go('session', { id: r.id });
+  }
+  function manualStudyForm(rid, fromChapter) {
+    const r = byId(S.rounds, rid); const ch = byId(S.chapters, r.chapterId);
+    sheet('<h2 style="margin-top:0">ثبت دستی زمان مطالعه</h2><div class="small muted">' + esc(ch.title) + ' · دور ' + fa(r.roundNumber) + '</div><form data-form="manualStudy" data-id="' + rid + '">' +
+      '<div class="grid2">' + num('h', 'ساعت', '') + num('m', 'دقیقه', '') + '</div>' +
+      '<label class="f"><span>روز مطالعه</span></label><div class="seg">' + [[0, 'امروز'], [1, 'دیروز'], [2, 'پریروز']].map(([v, l]) => '<button type="button" data-a="mDay" data-v="' + v + '" aria-pressed="' + (v === 0) + '">' + l + '</button>').join('') + '</div><input type="hidden" name="day" value="0">' +
+      '<label class="check" style="margin-top:10px"><input type="checkbox" name="finish"><span>مطالعه‌ی این فصل تمام شد (رفتن به تست)</span></label>' +
+      '<div id="formerr" class="err" role="alert"></div><button class="btn pri block big" style="margin-top:12px">ثبت</button></form>');
+  }
   function startRound(chId) {
     const ch = byId(S.chapters, chId); const c = chapterCourse(ch); const ex = activeRound(chId); if (ex) return go('session', { id: ex.id });
     const r = { id: uid(), chapterId: ch.id, courseId: c.id, roundNumber: chapterRounds(ch.id).length + 1, startDate: todayKey(), endDate: null, status: 'active', step: 'study', cycle: 1, tests: [], createdAt: nowIso() };
@@ -948,6 +1009,17 @@
 
   // ---------- form submit ----------
   const F = {
+    manualStudy: (f) => {
+      const r = byId(S.rounds, f.dataset.id); const hh = L.parseIntSafe(f.h.value), mm = L.parseIntSafe(f.m.value); const err = $('#formerr', f);
+      if (Number.isNaN(hh) || Number.isNaN(mm) || (hh != null && (hh < 0 || hh > 16)) || (mm != null && (mm < 0 || mm > 600))) return (err.textContent = 'ساعت و دقیقه را درست وارد کنید.');
+      const sec = ((hh || 0) * 60 + (mm || 0)) * 60; if (sec <= 0) return (err.textContent = 'مدت مطالعه را وارد کنید.');
+      const day = Number(f.day.value) || 0; const d = new Date(); d.setDate(d.getDate() - day); if (day) d.setHours(20, 0, 0, 0);
+      const end = d.getTime(); const startIso = new Date(end - sec * 1000).toISOString();
+      logSession({ roundId: r.id, chapterId: r.chapterId, courseId: r.courseId, step: 'study', cycle: r.cycle, startedAt: startIso, endedAt: new Date(end).toISOString(), durationSec: sec, manualEdit: true });
+      if (r.step !== 'study') { if (r.step === 'result') r.cycle++; r.step = 'study'; }
+      if (f.finish.checked) { r.step = 'test'; r.readDoneAt = nowIso(); }
+      save(); closeSheet(true); if (cur().s !== 'session' || cur().id !== r.id) go('session', { id: r.id }); else render(); toast(fmtDur(sec) + ' مطالعه ثبت شد' + (f.finish.checked ? '؛ حالا تست' : ''));
+    },
     obExam: (f) => { const v = f.examName.value.trim(); if (!v) { ob.err = 'نام آزمون را وارد کنید.'; return render(); } S.settings.examName = v; ob.err = ''; ob.step++; render(); },
     obAddCombo: (f) => { const t = f.t.value.trim(); if (!t) return; const code = /^[0-9۰-۹]+$/.test(t) ? L.toEnDigits(t) : ''; S.combos.push({ id: uid(), code, title: code ? '' : t, active: true }); render(); },
     obAddCourses: (f) => { addCoursesFromText(f.names.value, f.test.checked); ob.err = ''; render(); },
@@ -1015,7 +1087,7 @@
       if (!r) { r = { id: uid(), chapterId: ch.id, courseId: c.id, roundNumber: chapterRounds(ch.id).length + 1, startDate: todayKey(), endDate: null, status: 'active', step: 'result', cycle: 1, tests: [], createdAt: nowIso() }; S.rounds.push(r); }
       else if (r.tests.length) r.cycle++;
       const now = Date.now(); const ss = Math.round((study || 0) * 60), ts = Math.round((tmin || 0) * 60);
-      if (ss) logSession({ roundId: r.id, chapterId: ch.id, courseId: c.id, step: 'study', startedAt: new Date(now - (ss + ts) * 1000).toISOString(), endedAt: new Date(now - ts * 1000).toISOString(), durationSec: ss, manualEdit: true });
+      if (ss) logSession({ roundId: r.id, chapterId: ch.id, courseId: c.id, step: 'study', cycle: r.cycle, startedAt: new Date(now - (ss + ts) * 1000).toISOString(), endedAt: new Date(now - ts * 1000).toISOString(), durationSec: ss, manualEdit: true });
       const test = Object.assign({ id: uid(), at: nowIso(), seconds: ts, cycle: r.cycle }, n.test); r.tests.push(test);
       if (ts) logSession({ roundId: r.id, chapterId: ch.id, courseId: c.id, testId: test.id, step: 'test', startedAt: new Date(now - ts * 1000).toISOString(), endedAt: nowIso(), durationSec: ts, manualEdit: true });
       r.step = 'result'; if (f.close.checked) { if (S.timer && S.timer.roundId === r.id) S.timer = null; r.status = 'done'; r.endDate = todayKey(); }
@@ -1069,6 +1141,7 @@
   function tick() {
     if (!S || !S.timer) return; const ms = tElapsed();
     document.querySelectorAll('[data-timer]').forEach((e) => (e.textContent = fmtClock(ms)));
+    document.querySelectorAll('[data-total]').forEach((e) => (e.textContent = fmtDur(Number(e.dataset.total) + Math.round(ms / 1000))));
     const cw = $('#capwarn'); const t = S.timer;
     if (cw && t.step === 'study' && t.roundId) { const r = byId(S.rounds, t.roundId); const ch = r && byId(S.chapters, r.chapterId); const cap = ch && ch.estMinutes; const over = cap > 0 && ms > cap * 60000; const want = over ? 'over' : ''; if (cw.dataset.s !== want) { cw.dataset.s = want; cw.innerHTML = over ? '<div class="banner warn" role="status" style="margin-bottom:10px">از زمان تخمینی ' + fa(cap) + ' دقیقه گذشت.</div>' : ''; } }
   }
