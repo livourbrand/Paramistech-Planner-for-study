@@ -45,7 +45,7 @@
   const VERDICT = { faster: ['پیشرفت: زمان کمتر، دقت حفظ شد', 'ok'], better: ['درصد بهتر', 'ok'], rushed: ['زمان کمتر ولی افت درصد', 'bad'], worse: ['افت درصد', 'bad'], same: ['بدون تغییر', ''] };
   const STEP_LABEL = { study: 'مطالعه', test: 'تست', result: 'نتیجه', lang: 'آزمون', scan: 'مطالعه', restudy: 'مطالعه', deep: 'مطالعه', worked: 'مطالعه', resolve: 'مطالعه', similar: 'تست', quick: 'ثبت سریع' };
   const STUDY_STEPS = ['study', 'scan', 'restudy', 'deep', 'worked', 'resolve'];
-  const COLORS = ['#1F5E57', '#3B5BA9', '#8A4FB0', '#B0533B', '#B08A1E', '#2E7D32', '#6B6B66', '#C2185B'];
+  const COLORS = ['#2F4EBF', '#3B5BA9', '#8A4FB0', '#B0533B', '#B08A1E', '#2E7D32', '#6B6B66', '#C2185B'];
 
   // ---------- state ----------
   function defaultState() {
@@ -59,7 +59,7 @@
     const mk = (name, type, cs, i) => ({ id: uid(), name, type, color: COLORS[i % COLORS.length], combos: cs, coef: {}, archived: false, createdAt: t, updatedAt: t, deletedAt: null });
     return {
       app: 'konkur-dr-study', schema: SCHEMA, updatedAt: 0,
-      settings: { onboarded: false, examDate: '2027-01-31', testCount: 20, masteryPct: 90, reviewPct: 75, negOn: false, negRatio: 3, theme: 'auto', lastBackupAt: null, introDone: false, seenTips: {}, checklistHidden: false, capacity: [360, 360, 360, 360, 360, 240, 360] },
+      settings: { onboarded: false, examDate: '2027-01-31', testCount: 20, masteryPct: 90, reviewPct: 75, negOn: false, negRatio: 3, theme: 'auto', lastBackupAt: null, examName: 'کنکور دکتری مدیریت', groupLabel: 'ترکیب', preset: 'mgmt', introDone: false, seenTips: {}, checklistHidden: false, capacity: [360, 360, 360, 360, 360, 240, 360] },
       combos,
       courses: [
         mk('زبان انگلیسی', 'test', all, 6), mk('آمار و کاربرد در مدیریت', 'chapter', all, 1), mk('مبانی سازمان و مدیریت', 'chapter', all, 0),
@@ -152,7 +152,7 @@
   // ---------- domain ----------
   const activeComboIds = () => S.combos.filter((c) => c.active).map((c) => c.id);
   function courseVisible(c) { if (c.deletedAt || c.archived) return false; if (!c.combos || !c.combos.length) return true; const a = activeComboIds(); return c.combos.some((id) => a.includes(id)); }
-  const visibleCourses = () => S.courses.filter(courseVisible);
+  const visibleCourses = () => S.courses.filter(courseVisible).sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
   const courseBooks = (cid) => live(S.books).filter((b) => b.courseId === cid);
   const bookChapters = (bid) => live(S.chapters).filter((c) => c.bookId === bid);
   const hasKids = (id) => live(S.chapters).some((x) => x.parentId === id);
@@ -216,11 +216,32 @@
   function setTab(t) { nav.tab = t; nav.stack = []; render(); window.scrollTo(0, 0); }
 
   // ---------- UI primitives ----------
+  const G = () => S.settings.groupLabel || 'ترکیب';
+  const comboLabel = (cb) => cb.code ? G() + ' ' + faD(cb.code) : cb.title;
+  const GEAR = SVG('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>');
+  const DOTS = SVG('<circle cx="12" cy="5" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="19" r="1.2"/>');
+  const gearBtn = () => '<button class="iconbtn" data-a="tab" data-v="more" aria-label="بیشتر و تنظیمات">' + GEAR + '</button>';
   function top(title, sub, right) {
-    return '<div class="top">' + (nav.stack.length ? '<button class="iconbtn" data-a="back" aria-label="بازگشت">' + ICON.back + '</button>' : '') +
-      '<div class="grow"><h1 style="font-size:20px;margin:0">' + esc(title) + '</h1>' + (sub ? '<div class="small muted">' + sub + '</div>' : '') + '</div>' + (right || '') + '</div>';
+    const root = !nav.stack.length;
+    return '<div class="top">' + (!root ? '<button class="iconbtn" data-a="back" aria-label="بازگشت">' + ICON.back + '</button>' : '') +
+      '<div class="grow"><h1 class="ttl">' + esc(title) + '</h1>' + (sub ? '<div class="small muted">' + sub + '</div>' : '') + '</div>' + (right || '') + (root && nav.tab !== 'more' ? gearBtn() : '') + '</div>';
   }
-  function toast(msg) { document.querySelectorAll('.toast').forEach((x) => x.remove()); const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); t.setAttribute('aria-live', 'polite'); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 2600); }
+  let undoFn = null;
+  function toast(msg, undo) {
+    document.querySelectorAll('.toast').forEach((x) => x.remove()); const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); t.setAttribute('aria-live', 'polite');
+    t.innerHTML = '<span>' + esc(msg) + '</span>' + (undo ? '<button data-a="undo">بازگرداندن</button>' : ''); undoFn = undo || null;
+    document.body.appendChild(t); setTimeout(() => { t.remove(); if (undoFn === undo) undoFn = null; }, undo ? 6000 : 2600);
+  }
+  function menuSheet(title, sub, items) {
+    sheet('<div style="margin-bottom:8px"><h2 style="margin:0">' + esc(title) + '</h2>' + (sub ? '<div class="small muted">' + sub + '</div>' : '') + '</div><div class="menu">' +
+      items.filter(Boolean).map(([a, label, attrs, danger]) => '<button class="mi' + (danger ? ' danger' : '') + '" data-a="' + a + '" ' + (attrs || '') + '>' + label + '</button>').join('') + '</div><button class="btn block" style="margin-top:12px" data-a="closeSheet">بستن</button>');
+  }
+  function hero(act, cap) {
+    const p = cap ? Math.min(1, act.sec / (cap * 60)) : 0; const C = 2 * Math.PI * 34;
+    return '<div class="hero"><svg width="92" height="92" viewBox="0 0 92 92" aria-hidden="true"><circle cx="46" cy="46" r="34" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="10"/><circle cx="46" cy="46" r="34" fill="none" stroke="#FFD166" stroke-width="10" stroke-linecap="round" stroke-dasharray="' + (C * p).toFixed(1) + ' ' + C.toFixed(1) + '" transform="rotate(-90 46 46)"/><text x="46" y="52" text-anchor="middle" font-size="17" font-weight="700" fill="#fff">' + (cap ? faD(Math.round(p * 100)) + '٪' : '—') + '</text></svg>' +
+      '<div class="grow"><div class="hk">مطالعه‌ی امروز</div><div class="hv">' + fmtDur(act.sec) + '</div><div class="hs">' + (cap ? 'از ' + fmtDur(cap * 60) + ' ظرفیت' : 'ظرفیت امروز تعیین نشده') + '</div>' +
+      '<div class="hrow"><span><b>' + fa(act.tests.count) + '</b> تست</span><span><b>' + (act.tests.count ? fa(L.pctRaw(act.tests.correct, act.tests.count), 0) + '٪' : '—') + '</b> صحیح</span></div></div></div>';
+  }
   let sheetReturn = null, pendingConfirm = null;
   function sheet(html) {
     closeSheet(true); sheetReturn = document.activeElement;
@@ -252,50 +273,66 @@
       const V = { today: vToday, plan: vPlan, courses: vCourses, course: vCourse, book: vBook, chapter: vChapter, session: vSession, stats: vStats, more: vMore, settings: vSettings, combos: vCombos, bin: vBin, backup: vBackup, audit: vAudit, selftest: vSelfTest, sessions: vSessions, help: vHelp, intro: () => vIntro(true) };
       html = (V[c.s] || vToday)(c);
     } catch (e) { console.error(e); html = '<div class="banner bad">خطا در نمایش این صفحه. <button class="btn sm" data-a="home">بازگشت به امروز</button></div>'; }
-    const tabs = [['today', 'امروز', ICON.today], ['plan', 'برنامه', ICON.plan], ['courses', 'درس‌ها', ICON.book], ['stats', 'آمار', ICON.stats], ['more', 'بیشتر', ICON.more]];
+    const tb = ([k, l, i]) => '<button data-a="tab" data-v="' + k + '" ' + (nav.tab === k ? 'aria-current="page"' : '') + '>' + i + '<span>' + l + '</span></button>';
+    const fab = '<button class="fab' + (S.timer ? ' live' : '') + '" data-a="fab" aria-label="' + (S.timer ? 'ادامه‌ی جلسه' : 'شروع مطالعه') + '">' + (S.timer ? '<span class="fabt" data-timer>' + fmtClock(tElapsed()) + '</span>' : SVG('<path d="M8 5v14l11-7z" fill="currentColor"/>')) + '</button>';
     app().innerHTML = '<main class="wrap">' + html + '</main><nav class="tabs" aria-label="ناوبری اصلی"><div class="in">' +
-      tabs.map(([k, l, i]) => '<button data-a="tab" data-v="' + k + '" ' + (nav.tab === k ? 'aria-current="page"' : '') + '>' + i + '<span>' + l + '</span></button>').join('') + '</div></nav>';
+      [['today', 'امروز', ICON.today], ['plan', 'برنامه', ICON.plan]].map(tb).join('') + '<div class="fabwrap">' + fab + '</div>' + [['courses', 'درس‌ها', ICON.book], ['stats', 'آمار', ICON.stats]].map(tb).join('') + '</div></nav>';
     tick();
   }
   let applyTheme = function () { const t = S && S.settings.theme; if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); };
 
   // ---------- onboarding ----------
-  function comboNames(c) { if (!c.combos || !c.combos.length) return 'همه'; return c.combos.map((id) => byId(S.combos, id)).filter(Boolean).map((x) => 'ترکیب ' + faD(x.code)).join('، '); }
+  function comboNames(c) { if (!S.combos.length) return ''; if (!c.combos || !c.combos.length) return 'همه'; return c.combos.map((id) => byId(S.combos, id)).filter(Boolean).map(comboLabel).join('، '); }
   function capacityInputs(cap) { return '<div class="grid4" style="grid-template-columns:repeat(4,1fr)">' + WD_ORDER.map((wd) => num('cap' + wd, WD[wd], Math.round(cap[wd] / 60 * 10) / 10)).join('') + '</div>'; }
   function readCapacity(f) { const out = []; for (let wd = 0; wd < 7; wd++) { const n = L.parseNum(f['cap' + wd].value); if (n == null || Number.isNaN(n) || n < 0 || n > 18) return null; out[wd] = Math.round(n * 60); } return out; }
   function vOnboard() {
     if (!S.settings.introDone) return vIntro(false);
     if (!ob) ob = { step: 0, err: '' };
-    const st = ob.step, N = 4;
+    const st = ob.step, N = 5; const custom = S.settings.preset === 'custom';
     const head = '<div class="small muted" style="margin-top:8px">مرحله ' + faD(st + 1) + ' از ' + faD(N) + '</div><div class="bar" style="margin:6px 0 16px"><i style="width:' + ((st + 1) / N * 100) + '%"></i></div>';
+    const nav2 = (nextLabel) => '<div class="row" style="margin-top:16px">' + (st > 0 ? '<button class="btn grow" data-a="obPrev">قبلی</button>' : '') + '<button class="btn pri grow big" data-a="obNext">' + (nextLabel || 'ادامه') + '</button></div>';
     const prev = '<div class="row" style="margin-top:12px"><button class="btn grow" data-a="obPrev">قبلی</button></div>';
-    const brand = '<div class="row" style="gap:10px;margin-top:6px"><span style="width:40px;height:40px;border-radius:12px;background:#1F5E57;display:inline-flex;align-items:center;justify-content:center;flex:none"><svg viewBox="0 0 120 120" width="30" height="30"><circle cx="60" cy="60" r="38" fill="none" stroke="#2F7A71" stroke-width="9"/><path d="M60 22 A38 38 0 1 1 22 60" fill="none" stroke="#F4E3B5" stroke-width="9" stroke-linecap="round"/><path d="M50 80 V40 H64 A12 12 0 0 1 64 64 H50" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>اپلیکیشن درسی پارامیس تک</b></div>';
-    if (st === 0) return brand + head + '<h1>ترکیب‌های هدف</h1><p class="muted">آزمون دکتری مدیریت (کد ۲۱۶۲). فقط دروس ترکیب‌های فعال در برنامه می‌آیند.</p><div class="card">' +
-      S.combos.map((c) => '<label class="check"><input type="checkbox" data-a="obCombo" data-id="' + c.id + '" ' + (c.active ? 'checked' : '') + '><span>ترکیب ' + faD(c.code) + ' — ' + esc(c.title) + '</span></label>').join('') + '</div><button class="btn pri block big" style="margin-top:16px" data-a="obNext">ادامه</button>';
-    if (st === 1) return head + '<h1>دروس</h1><p class="muted">درسی را که نمی‌خواهید بردارید. بعداً می‌توانید درس اضافه کنید.</p><div class="card">' +
-      S.courses.filter((c) => !c.deletedAt).map((c) => '<label class="check"><input type="checkbox" data-a="obCourse" data-id="' + c.id + '" ' + (!c.archived ? 'checked' : '') + '><span class="grow"><b>' + esc(c.name) + '</b><br><span class="small muted">' + (c.type === 'test' ? 'فقط تست‌زنی' : 'فصل‌به‌فصل') + ' · ' + comboNames(c) + '</span></span></label>').join('') +
-      '</div><div class="row" style="margin-top:16px"><button class="btn grow" data-a="obPrev">قبلی</button><button class="btn pri grow" data-a="obNext">ادامه</button></div>';
-    if (st === 2) { const j = L.keyToJalali(S.settings.examDate);
+    const err = ob.err ? '<div class="err" role="alert">' + esc(ob.err) + '</div>' : '';
+    if (st === 0) {
+      const opt = (v, t, d) => '<button class="card tap choice' + (S.settings.preset === v ? ' on' : '') + '" data-a="obPreset" data-v="' + v + '" aria-pressed="' + (S.settings.preset === v) + '"><b>' + t + '</b><div class="small muted">' + d + '</div></button>';
+      return '<div style="margin-top:6px">' + BRAND + '</div>' + head + '<h1>برای چه آزمونی می‌خوانید؟</h1><p class="muted">اپ برای هر رشته و آزمونی کار می‌کند. بعداً از تنظیمات هم قابل تغییر است.</p><div class="list">' +
+        opt('mgmt', 'کنکور دکتری مدیریت', 'دروس و ترکیب‌های ۱، ۵ و ۶ آماده‌اند؛ فقط تأیید یا ویرایش می‌کنید.') + opt('custom', 'رشته یا آزمون دیگر', 'ارشد، دکتری، کنکور سراسری، استخدامی یا هر آزمون دیگر؛ دروس را خودتان وارد می‌کنید.') + '</div>' +
+        (custom ? '<form data-form="obExam" class="card" style="margin-top:12px">' + txt('examName', 'نام آزمون یا رشته', S.settings.examName, 'placeholder="مثلاً کنکور ارشد روانشناسی"') + err + '<button class="btn pri block big" style="margin-top:14px">ادامه</button></form>' : nav2());
+    }
+    if (st === 1) {
+      return head + '<h1>' + (custom ? 'گرایش‌ها (اختیاری)' : 'ترکیب‌های هدف') + '</h1><p class="muted">' + (custom ? 'اگر آزمون شما گرایش یا ترکیب‌های مختلف با دروس متفاوت دارد اینجا اضافه کنید؛ وگرنه این مرحله را رد کنید.' : 'آزمون دکتری مدیریت (کد ۲۱۶۲). فقط دروس ترکیب‌های فعال در برنامه می‌آیند.') + '</p>' +
+        (S.combos.length ? '<div class="card">' + S.combos.map((c) => '<div class="row"><label class="check grow"><input type="checkbox" data-a="obCombo" data-id="' + c.id + '" ' + (c.active ? 'checked' : '') + '><span>' + esc(comboLabel(c)) + (c.code && c.title ? ' — ' + esc(c.title) : '') + '</span></label><button class="iconbtn ghosti" data-a="obDelCombo" data-id="' + c.id + '" aria-label="حذف">×</button></div>').join('') + '</div>' : '') +
+        '<form data-form="obAddCombo" class="row" style="margin-top:10px"><input name="t" type="text" placeholder="' + (custom ? 'نام گرایش، مثلاً بالینی' : 'شماره یا نام ترکیب جدید') + '" class="grow"><button class="btn">افزودن</button></form>' + nav2(custom && !S.combos.length ? 'رد کردن' : null);
+    }
+    if (st === 2) {
+      const cs = S.courses.filter((c) => !c.deletedAt);
+      return head + '<h1>دروس</h1><p class="muted">' + (cs.length ? 'درسی را که نمی‌خواهید بردارید یا نوعش را عوض کنید.' : 'دروس آزمون را وارد کنید: هر خط یک درس.') + '</p>' +
+        (cs.length ? '<div class="card">' + cs.map((c) => '<div class="row" style="border-bottom:1px solid var(--line)"><label class="check grow"><input type="checkbox" data-a="obCourse" data-id="' + c.id + '" ' + (!c.archived ? 'checked' : '') + '><span><b>' + esc(c.name) + '</b>' + (comboNames(c) ? '<br><span class="small muted">' + comboNames(c) + '</span>' : '') + '</span></label><button class="chip ' + (c.type === 'test' ? 'acc' : '') + '" style="border:0;min-height:36px;cursor:pointer" data-a="obType" data-id="' + c.id + '">' + (c.type === 'test' ? 'فقط تست' : 'فصل‌به‌فصل') + '</button></div>').join('') + '</div><p class="small muted" style="margin-top:6px">«فصل‌به‌فصل»: مطالعه و تست هر فصل. «فقط تست»: درس بدون فصل مثل زبان. با لمس برچسب عوض می‌شود.</p>' : '') +
+        '<form data-form="obAddCourses" class="card" style="margin-top:10px">' + area('names', cs.length ? 'افزودن درس (هر خط یک درس)' : 'نام دروس (هر خط یک درس)', '', 'ادبیات\nزبان انگلیسی\nآمار') + '<label class="check"><input type="checkbox" name="test"><span>این دروس «فقط تست» هستند</span></label><button class="btn block" style="margin-top:8px">افزودن</button></form>' + err + nav2();
+    }
+    if (st === 3) { const j = L.keyToJalali(S.settings.examDate);
       return head + '<h1>تاریخ آزمون و ساعت مفید</h1><form data-form="obDate"><div class="card"><h3>تاریخ آزمون</h3><div class="grid4" style="grid-template-columns:1fr 1fr 1.4fr">' + num('jd', 'روز', j.jd) + num('jm', 'ماه', j.jm) + num('jy', 'سال', j.jy) + '</div></div>' +
         '<div class="card" style="margin-top:12px"><h3>ساعت مفید مطالعه در هر روز هفته</h3><p class="small muted">برنامه‌ی هر روز با این ظرفیت سنجیده می‌شود.</p>' + capacityInputs(S.settings.capacity) + '</div>' +
-        (ob.err ? '<div class="err" role="alert">' + esc(ob.err) + '</div>' : '') + '<button class="btn pri block big" style="margin-top:16px">ادامه</button></form>' + prev; }
+        err + '<button class="btn pri block big" style="margin-top:16px">ادامه</button></form>' + prev; }
     const cs = S.courses.filter((c) => !c.deletedAt && !c.archived && c.type !== 'test');
+    if (!cs.length) return head + '<h1>آماده‌اید</h1><p class="muted">درس فصل‌به‌فصلی ندارید؛ هر وقت خواستید از بخش «درس‌ها» اضافه کنید.</p><button class="btn pri block big" data-a="obFinish">شروع</button>' + prev;
     return head + '<h1>اولین کتاب</h1><p class="muted">فهرست فصل‌ها را بچسبانید: هر خط یک فصل؛ خطی که با فاصله شروع شود زیرفصل است.</p><form data-form="obBook" class="card">' +
       '<label class="f"><span>درس</span><select name="courseId">' + cs.map((c) => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('') + '</select></label>' +
-      txt('title', 'عنوان کتاب', '') + area('batch', 'فصل‌ها', '', 'فصل ۱: مفاهیم پایه\nفصل ۲: برنامه‌ریزی\nفصل ۳: سازماندهی') +
-      (ob.err ? '<div class="err" role="alert">' + esc(ob.err) + '</div>' : '') + '<button class="btn pri block big" style="margin-top:16px">ثبت و شروع</button></form><button class="btn ghost block" style="margin-top:8px" data-a="obFinish">فعلاً بدون کتاب شروع کن</button>' + prev;
+      txt('title', 'عنوان کتاب یا جزوه', '') + area('batch', 'فصل‌ها', '', 'فصل ۱: مفاهیم پایه\nفصل ۲\nفصل ۳') +
+      err + '<button class="btn pri block big" style="margin-top:16px">ثبت و شروع</button></form><button class="btn ghost block" style="margin-top:8px" data-a="obFinish">فعلاً بدون کتاب شروع کن</button>' + prev;
   }
+  const BRAND = '<div class="row" style="gap:10px"><span class="logo"><svg viewBox="0 0 120 120" width="30" height="30"><circle cx="60" cy="60" r="38" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="9"/><path d="M60 22 A38 38 0 1 1 22 60" fill="none" stroke="#FFD166" stroke-width="9" stroke-linecap="round"/><path d="M50 80 V40 H64 A12 12 0 0 1 64 64 H50" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>اپلیکیشن درسی پارامیس تک</b></div>';
 
   // ---------- guidance: intro, tips, checklist, help ----------
   const ART = {
-    welcome: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true"><rect x="80" y="10" width="80" height="80" rx="20" fill="#1F5E57"/><circle cx="120" cy="50" r="25" fill="none" stroke="#2F7A71" stroke-width="6"/><path d="M120 25 A25 25 0 1 1 95 50" fill="none" stroke="#F4E3B5" stroke-width="6" stroke-linecap="round"/><path d="M114 63 V38 H123 A8 8 0 0 1 123 54 H114" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><rect x="40" y="108" width="44" height="10" rx="5" fill="var(--acc-soft)"/><rect x="98" y="108" width="44" height="10" rx="5" fill="var(--acc)"/><rect x="156" y="108" width="44" height="10" rx="5" fill="var(--acc-soft)"/></svg>',
+    welcome: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true"><rect x="80" y="10" width="80" height="80" rx="20" fill="#2F4EBF"/><circle cx="120" cy="50" r="25" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="6"/><path d="M120 25 A25 25 0 1 1 95 50" fill="none" stroke="#FFD166" stroke-width="6" stroke-linecap="round"/><path d="M114 63 V38 H123 A8 8 0 0 1 123 54 H114" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><rect x="40" y="108" width="44" height="10" rx="5" fill="var(--acc-soft)"/><rect x="98" y="108" width="44" height="10" rx="5" fill="var(--acc)"/><rect x="156" y="108" width="44" height="10" rx="5" fill="var(--acc-soft)"/></svg>',
     plan: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true">' + [0, 1, 2, 3, 4, 5, 6].map((i) => { const h = [60, 80, 45, 90, 70, 30, 75][i]; return '<rect x="' + (22 + i * 30) + '" y="' + (120 - h) + '" width="20" height="' + h + '" rx="5" fill="' + (i === 3 ? 'var(--bad)' : 'var(--acc)') + '" opacity="' + (i === 3 ? 1 : 0.85) + '"/>'; }).join('') + '<line x1="14" x2="226" y1="40" y2="40" stroke="var(--ink)" stroke-width="2" stroke-dasharray="5 4"/><text x="226" y="32" font-size="11" text-anchor="end" fill="var(--muted)">ظرفیت روز</text></svg>',
     round: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true"><circle cx="45" cy="60" r="28" fill="var(--acc-soft)" stroke="var(--acc)" stroke-width="3"/><path d="M45 44 V60 L56 67" fill="none" stroke="var(--acc)" stroke-width="3" stroke-linecap="round"/><text x="45" y="112" font-size="12" text-anchor="middle" fill="var(--ink)">مطالعه</text><path d="M80 60 H100" stroke="var(--muted)" stroke-width="2"/><path d="M96 55 L102 60 L96 65" fill="none" stroke="var(--muted)" stroke-width="2"/><rect x="104" y="34" width="34" height="52" rx="6" fill="var(--card)" stroke="var(--acc)" stroke-width="3"/><path d="M111 48 H131 M111 60 H131 M111 72 H124" stroke="var(--acc)" stroke-width="3" stroke-linecap="round"/><text x="121" y="112" font-size="12" text-anchor="middle" fill="var(--ink)">تست</text><path d="M144 60 H164" stroke="var(--muted)" stroke-width="2"/><path d="M160 55 L166 60 L160 65" fill="none" stroke="var(--muted)" stroke-width="2"/><circle cx="196" cy="60" r="28" fill="var(--ok-soft)" stroke="var(--ok)" stroke-width="3"/><text x="196" y="66" font-size="16" font-weight="700" text-anchor="middle" fill="var(--ok)">۸۵٪</text><text x="196" y="112" font-size="12" text-anchor="middle" fill="var(--ink)">نتیجه</text></svg>',
     compare: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true"><line x1="20" x2="220" y1="116" y2="116" stroke="var(--line)"/>' + [[50, 70, 60], [120, 52, 78], [190, 36, 90]].map(([x, h, p]) => '<rect x="' + (x - 16) + '" y="' + (116 - h) + '" width="32" height="' + h + '" rx="5" fill="var(--soft)" stroke="var(--line)"/>').join('') + '<path d="M50 70 L120 44 L190 26" fill="none" stroke="var(--acc)" stroke-width="3"/>' + [[50, 70, '۶۰٪'], [120, 44, '۷۸٪'], [190, 26, '۹۰٪']].map(([x, y, t]) => '<circle cx="' + x + '" cy="' + y + '" r="5" fill="var(--acc)"/><text x="' + x + '" y="' + (y - 10) + '" font-size="12" font-weight="700" text-anchor="middle" fill="var(--acc)">' + t + '</text>').join('') + '<text x="50" y="134" font-size="11" text-anchor="middle" fill="var(--muted)">دور ۱</text><text x="120" y="134" font-size="11" text-anchor="middle" fill="var(--muted)">دور ۲</text><text x="190" y="134" font-size="11" text-anchor="middle" fill="var(--muted)">دور ۳</text></svg>',
     safe: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true"><rect x="88" y="14" width="64" height="112" rx="12" fill="var(--card)" stroke="var(--ink)" stroke-width="3"/><rect x="100" y="34" width="40" height="8" rx="4" fill="var(--acc)"/><rect x="100" y="50" width="30" height="8" rx="4" fill="var(--acc-soft)"/><rect x="100" y="66" width="36" height="8" rx="4" fill="var(--acc-soft)"/><path d="M168 64 h30 v34 h-30 z" fill="var(--acc-soft)" stroke="var(--acc)" stroke-width="3"/><path d="M174 64 v-10 a9 9 0 0 1 18 0 v10" fill="none" stroke="var(--acc)" stroke-width="3"/><text x="183" y="118" font-size="11" text-anchor="middle" fill="var(--muted)">پشتیبان</text></svg>',
   };
   const INTRO = [
-    ['welcome', 'به پارامیس تک خوش آمدید', 'برنامه‌ریز مطالعه‌ی کنکور دکتری مدیریت. سه کار اصلی دارد: برنامه بریزید، زمان و تست هر فصل را بسنجید، و ببینید هر فصل در هر دور چقدر بهتر شده.'],
+    ['welcome', 'به پارامیس تک خوش آمدید', 'برنامه‌ریز مطالعه برای هر رشته و آزمونی. سه کار اصلی دارد: برنامه بریزید، زمان و تست هر فصل را بسنجید، و ببینید هر فصل در هر دور چقدر بهتر شده.'],
     ['plan', 'هر هفته برنامه بریزید', 'در تب «برنامه» برای هر روز فصل‌ها را با زمان هدف و تعداد تست هدف بچینید. اگر برنامه‌ی روزی از ساعت مفید آن روز بیشتر شود، نوارش قرمز می‌شود.'],
     ['round', 'هر دور: مطالعه، تست، نتیجه', 'روی فصل «شروع دور» را بزنید: زمان‌سنج مطالعه، بعد زمان‌سنج تست، بعد تعداد صحیح یا درصد. بدون زمان‌سنج خواندید؟ «ثبت سریع» را بزنید.'],
     ['compare', 'دورها را مقایسه کنید', 'هر بار که سراغ یک فصل برمی‌گردید یک دور تازه است. درصد و زمان همه‌ی دورها کنار هم نمایش داده می‌شود. زمان کمتر فقط وقتی پیشرفت است که درصد افت نکرده باشد.'],
@@ -313,9 +350,9 @@
   const TIPS = {
     today: ['صفحه‌ی امروز', 'برنامه‌ی امروز و پیشرفت واقعی هر مورد اینجاست. «شروع دور» زمان‌سنج را باز می‌کند؛ «ثبت سریع» برای وقتی است که بدون زمان‌سنج خوانده‌اید.'],
     plan: ['برنامه‌ی هفتگی', 'برای هر روز «افزودن» را بزنید و فصل، زمان هدف و تعداد تست هدف را تعیین کنید. نوار هر روز ظرفیت آن روز را نشان می‌دهد. «کپی به فردا» برنامه را تکرار می‌کند. با فلش‌ها بین هفته‌ها جابه‌جا شوید.'],
-    courses: ['درس‌ها', 'روی هر درس بزنید تا کتاب اضافه کنید. فقط دروس ترکیب‌های فعال اینجا هستند؛ ترکیب‌ها را از «بیشتر ← ترکیب‌ها» عوض کنید.'],
+    courses: ['درس‌ها', 'روی هر درس بزنید تا کتاب اضافه کنید. با دکمه‌ی ⋮ کنار هر درس، آن را ویرایش، جابه‌جا، بایگانی یا حذف کنید.'],
     course: ['کتاب‌ها و جدول فصل‌ها', 'برای هر درس یک یا چند کتاب اضافه کنید. جدول پایین صفحه درصد و زمان همه‌ی فصل‌ها را در هر دور کنار هم نشان می‌دهد.'],
-    book: ['فصل‌های کتاب', 'با «ورود دسته‌ای» فهرست را یکجا بچسبانید: هر خط یک فصل، خطی که با فاصله شروع شود زیرفصل. با فلش‌ها ترتیب را عوض کنید و روی هر فصل بزنید تا جزئیاتش را ببینید.'],
+    book: ['فصل‌های کتاب', 'با «ورود دسته‌ای» فهرست را یکجا بچسبانید: هر خط یک فصل، خطی که با فاصله شروع شود زیرفصل. با فلش‌ها ترتیب را عوض کنید. دکمه‌ی ⋮ هر فصل برای ویرایش، حذف از برنامه یا حذف است.'],
     chapter: ['صفحه‌ی فصل', '«شروع دور» یعنی یک بار کامل خواندن این فصل با زمان‌سنج و تست. هر بار که دوباره سراغ این فصل آمدید یک دور جدید بزنید تا نتیجه‌ها کنار هم مقایسه شوند. با دکمه‌ی ویرایش، اهمیت و زمان تخمینی را تعیین کنید.'],
     study: ['مرحله‌ی مطالعه', 'زمان‌سنج را بزنید و بخوانید. اگر از اپ خارج شوید یا صفحه قفل شود، زمان درست می‌ماند. با «ویرایش دستی» می‌توانید زمان را اصلاح کنید.'],
     test: ['مرحله‌ی تست', 'زمان‌سنج تست را بزنید و تست بزنید. بعد تعداد تست و تعداد صحیح را وارد کنید؛ اگر فقط درصد را دارید، «درصد» را انتخاب کنید.'],
@@ -367,13 +404,12 @@
     const tk = todayKey(); const days = L.daysBetween(tk, S.settings.examDate);
     const act = dayActual(tk); const cap = capacityOf(tk); const plans = dayPlans(tk);
     const planned = plans.reduce((a, p) => a + (p.minutes || 0), 0);
-    let h = '<div class="row between" style="margin-top:4px"><div><div class="small muted">' + fmtJ(tk, true) + ' ' + faD(L.keyToJalali(tk).jy) + '</div><h1 style="margin:0">امروز</h1></div>' +
-      '<div style="text-align:left"><div class="count">' + (days >= 0 ? fa(days) : '—') + '</div><div class="small muted">' + (days > 0 ? 'روز تا آزمون' : days === 0 ? 'روز آزمون' : 'تاریخ آزمون گذشته') + '</div></div></div>';
+    let h = '<div class="row" style="margin-top:2px;align-items:flex-start"><div class="grow"><div class="small muted">' + fmtJ(tk, true) + ' ' + faD(L.keyToJalali(tk).jy) + '</div><h1 style="margin:0">امروز</h1><div class="small muted">' + esc(S.settings.examName) + '</div></div>' +
+      '<div style="text-align:center"><div class="count">' + (days >= 0 ? fa(days) : '—') + '</div><div class="small muted">' + (days > 0 ? 'روز تا آزمون' : days === 0 ? 'روز آزمون' : 'تاریخ آزمون گذشته') + '</div></div>' + gearBtn() + '</div>';
     h += checklist();
     if (S.timer) h += '<div style="margin-top:14px">' + runningCard() + '</div>';
     h += '<div style="margin-top:12px">' + tip('today') + '</div>';
-    h += '<div class="grid2"><div class="stat"><b>' + fmtDur(act.sec) + '</b><span>زمان امروز' + (cap ? ' از ' + fmtDur(cap * 60) : '') + '</span>' + (cap ? '<div style="margin-top:6px">' + bar(act.sec, cap * 60) + '</div>' : '') + '</div>' +
-      '<div class="stat"><b>' + fa(act.tests.count) + ' تست</b><span>درصد صحیح: ' + pctTxt(act.tests.count ? L.pctRaw(act.tests.correct, act.tests.count) : null) + '</span></div></div>';
+    h += hero(act, cap);
     h += '<div class="row between"><h2>برنامه‌ی امروز</h2><button class="btn sm" data-a="planForm" data-v="' + tk + '">افزودن</button></div>';
     if (plans.length) {
       h += '<div class="small muted" style="margin:-4px 0 8px">' + fmtDur(planned * 60) + ' برنامه‌ریزی‌شده' + (cap ? ' از ' + fmtDur(cap * 60) + ' ظرفیت' : '') + (cap && planned > cap ? ' · <span style="color:var(--bad)">بیشتر از ظرفیت</span>' : '') + '</div><div class="list">' + plans.map(planCard).join('') + '</div>';
@@ -446,21 +482,22 @@
   // ---------- COURSES ----------
   function vCourses() {
     const vis = visibleCourses(); const hidden = S.courses.filter((c) => !c.deletedAt && !courseVisible(c)); const act = S.combos.filter((c) => c.active);
-    let h = top('درس‌ها', 'ترکیب‌های فعال: ' + (act.length ? act.map((c) => faD(c.code)).join('، ') : 'هیچ'), '<button class="btn sm pri" data-a="courseForm">درس جدید</button>');
+    let h = top('درس‌ها', esc(S.settings.examName) + (S.combos.length ? ' · ' + G() + ': ' + (act.length ? act.map((c) => esc(c.code ? faD(c.code) : c.title)).join('، ') : 'هیچ') : ''));
+    h += '<div class="row" style="margin-bottom:12px"><button class="btn pri grow" data-a="courseForm">درس جدید</button><button class="btn grow" data-a="coursesBatch">افزودن چند درس</button></div>';
     h += tip('courses');
     h += '<div class="list">' + vis.map((c) => {
       let sub, prog = '';
       if (c.type === 'test') { const ls = S.langLogs.filter((l) => l.courseId === c.id); const s = L.sumTests(ls); sub = 'فقط تست‌زنی · ' + fa(ls.length) + ' آزمون · ' + pctTxt(s.count ? L.pctRaw(s.correct, s.count) : null); }
       else { const chs = courseChapters(c.id); const done = chs.filter((x) => chapterRounds(x.id).some((r) => r.status === 'done')).length; const sec = S.sessions.filter((s) => s.courseId === c.id).reduce((a, s) => a + s.durationSec, 0); sub = fa(chs.length) + ' فصل · ' + fa(done) + ' با دور کامل · ' + fmtDur(sec); if (chs.length) prog = '<div style="margin-top:8px">' + bar(done, chs.length, c.color) + '</div>'; }
-      return '<button class="card tap" data-a="openCourse" data-id="' + c.id + '"><div class="row"><span class="dot" style="background:' + esc(c.color) + '"></span><b class="grow">' + esc(c.name) + '</b></div><div class="small muted" style="margin-top:2px">' + sub + '</div>' + prog + '</button>';
+      return '<div class="card crs"><div class="row"><button class="grow tapzone" data-a="openCourse" data-id="' + c.id + '"><div class="row"><span class="cdot" style="background:' + esc(c.color) + '"></span><b class="grow">' + esc(c.name) + '</b></div><div class="small muted" style="margin-top:2px">' + sub + '</div>' + prog + '</button><button class="iconbtn ghosti" data-a="courseMenu" data-id="' + c.id + '" aria-label="گزینه‌های ' + esc(c.name) + '">' + DOTS + '</button></div></div>';
     }).join('') + '</div>';
-    if (!vis.length) h += '<div class="empty">هیچ درسی برای ترکیب‌های فعال نیست.</div>';
-    if (hidden.length) h += '<details class="card" style="margin-top:16px"><summary>بایگانی یا خارج از ترکیب‌های فعال (' + fa(hidden.length) + ')</summary>' + hidden.map((c) => '<div class="row between" style="padding:8px 0;border-top:1px solid var(--line)"><span>' + esc(c.name) + '</span><button class="btn sm" data-a="openCourse" data-id="' + c.id + '">باز کردن</button></div>').join('') + '</details>';
+    if (!vis.length) h += '<div class="card empty">' + (S.courses.some((c) => !c.deletedAt) ? 'هیچ درسی برای ' + G() + '‌های فعال نیست.' : 'هنوز درسی ندارید. «درس جدید» یا «افزودن چند درس» را بزنید.') + '</div>';
+    if (hidden.length) h += '<details class="card" style="margin-top:16px"><summary>بایگانی یا خارج از ' + G() + '‌های فعال (' + fa(hidden.length) + ')</summary>' + hidden.map((c) => '<div class="row between" style="padding:8px 0;border-top:1px solid var(--line)"><span>' + esc(c.name) + (c.archived ? ' <span class="small muted">· بایگانی</span>' : '') + '</span><button class="iconbtn ghosti" data-a="courseMenu" data-id="' + c.id + '" aria-label="گزینه‌ها">' + DOTS + '</button></div>').join('') + '</details>';
     return h;
   }
   function vCourse(p) {
     const c = byId(S.courses, p.id); if (!c || c.deletedAt) return top('درس پیدا نشد');
-    let h = top(c.name, comboNames(c), '<button class="iconbtn" data-a="courseForm" data-id="' + c.id + '" aria-label="ویرایش درس">' + ICON.edit + '</button>');
+    let h = top(c.name, comboNames(c), '<button class="iconbtn" data-a="courseMenu" data-id="' + c.id + '" aria-label="گزینه‌های درس">' + DOTS + '</button>');
     if (c.archived) h += '<div class="banner warn">این درس بایگانی است.</div>';
     if (c.type === 'test') return h + tip('testcourse') + testCourseBody(c);
     h += tip('course');
@@ -468,7 +505,7 @@
     const chs = courseChapters(c.id, true);
     h += '<div class="row between"><h2>کتاب‌ها</h2><button class="btn sm" data-a="bookForm" data-course="' + c.id + '">کتاب جدید</button></div>';
     const books = courseBooks(c.id);
-    h += books.length ? '<div class="list">' + books.map((b) => '<button class="card tap" data-a="openBook" data-id="' + b.id + '"><b>' + esc(b.title) + '</b><div class="small muted">' + (b.author ? esc(b.author) + ' · ' : '') + fa(bookChapters(b.id).length) + ' فصل و زیرفصل</div></button>').join('') + '</div>' : '<div class="card empty">هنوز کتابی برای این درس ثبت نشده.</div>';
+    h += books.length ? '<div class="list">' + books.map((b) => '<div class="card crs"><div class="row"><button class="grow tapzone" data-a="openBook" data-id="' + b.id + '"><b>' + esc(b.title) + '</b><div class="small muted">' + (b.author ? esc(b.author) + ' · ' : '') + fa(bookChapters(b.id).length) + ' فصل و زیرفصل</div></button><button class="iconbtn ghosti" data-a="bookMenu" data-id="' + b.id + '" aria-label="گزینه‌های کتاب">' + DOTS + '</button></div></div>').join('') + '</div>' : '<div class="card empty">هنوز کتابی برای این درس ثبت نشده.</div>';
     if (chs.length) h += '<h2>مقایسه‌ی فصل‌ها در دورها</h2>' + chapterMatrix(chs);
     return h;
   }
@@ -483,7 +520,7 @@
   function vBook(p) {
     const b = byId(S.books, p.id); if (!b || b.deletedAt) return top('کتاب پیدا نشد');
     const c = byId(S.courses, b.courseId); const chs = orderedChapters(b.id);
-    let h = top(b.title, esc(c.name) + (b.author ? ' · ' + esc(b.author) : ''), '<button class="iconbtn" data-a="bookForm" data-id="' + b.id + '" aria-label="ویرایش کتاب">' + ICON.edit + '</button>');
+    let h = top(b.title, esc(c.name) + (b.author ? ' · ' + esc(b.author) : ''), '<button class="iconbtn" data-a="bookMenu" data-id="' + b.id + '" aria-label="گزینه‌های کتاب">' + DOTS + '</button>');
     h += tip('book');
     h += '<div class="row" style="margin:8px 0 12px"><button class="btn pri grow" data-a="batchForm" data-id="' + b.id + '">ورود دسته‌ای فصل‌ها</button><button class="btn grow" data-a="chapterForm" data-book="' + b.id + '">فصل تکی</button></div>';
     if (!chs.length) return h + '<div class="card empty">فهرست فصل‌ها را با «ورود دسته‌ای» بچسبانید.</div>';
@@ -491,7 +528,7 @@
       const sibs = live(S.chapters).filter((x) => x.bookId === b.id && (x.parentId || null) === (ch.parentId || null)).sort((a, z) => a.order - z.order);
       const i = sibs.findIndex((x) => x.id === ch.id); const st = chapterState(ch); const rs = chapterRounds(ch.id).filter((r) => r.tests.length); const last = rs[rs.length - 1];
       return '<div class="chap ' + (ch.parentId ? 'sub ' : '') + (ch.priority === 'excluded' ? 'excluded' : '') + '"><div class="t" data-a="openChapter" data-id="' + ch.id + '" role="button" tabindex="0"><span>' + esc(ch.title) + '</span><span class="small muted">' + (hasKids(ch.id) ? 'دارای زیرفصل' : ch.priority === 'excluded' ? 'حذف از برنامه' : st.label + (last ? ' · ' + pctTxt(roundSummary(last).pct) : '')) + '</span></div>' +
-        '<div class="mv"><button data-a="moveCh" data-id="' + ch.id + '" data-v="-1" aria-label="بالا" ' + (i === 0 ? 'disabled' : '') + '>' + ICON.up + '</button><button data-a="moveCh" data-id="' + ch.id + '" data-v="1" aria-label="پایین" ' + (i === sibs.length - 1 ? 'disabled' : '') + '>' + ICON.down + '</button></div></div>';
+        '<div class="mv"><button data-a="moveCh" data-id="' + ch.id + '" data-v="-1" aria-label="بالا" ' + (i === 0 ? 'disabled' : '') + '>' + ICON.up + '</button><button data-a="moveCh" data-id="' + ch.id + '" data-v="1" aria-label="پایین" ' + (i === sibs.length - 1 ? 'disabled' : '') + '>' + ICON.down + '</button><button data-a="chapterMenu" data-id="' + ch.id + '" aria-label="گزینه‌های ' + esc(ch.title) + '">' + DOTS + '</button></div></div>';
     }).join('') + '</div>';
     return h;
   }
@@ -500,7 +537,7 @@
   function vChapter(p) {
     const ch = byId(S.chapters, p.id); if (!ch || ch.deletedAt) return top('فصل پیدا نشد');
     const b = byId(S.books, ch.bookId); const c = byId(S.courses, b.courseId); const parent = ch.parentId ? byId(S.chapters, ch.parentId) : null;
-    let h = top(ch.title, esc(c.name) + ' · ' + esc(b.title) + (parent ? ' · ' + esc(parent.title) : ''), '<button class="iconbtn" data-a="chapterForm" data-id="' + ch.id + '" aria-label="ویرایش فصل">' + ICON.edit + '</button>');
+    let h = top(ch.title, esc(c.name) + ' · ' + esc(b.title) + (parent ? ' · ' + esc(parent.title) : ''), '<button class="iconbtn" data-a="chapterMenu" data-id="' + ch.id + '" aria-label="گزینه‌های فصل">' + DOTS + '</button>');
     const meta = [chip('اولویت ' + PRI[ch.priority], ch.priority === 'excluded' ? 'bad' : '')];
     if (ch.importance) meta.push(chip('اهمیت ' + fa(ch.importance) + '/۵'));
     if (ch.pastTestCount != null) meta.push(chip(fa(ch.pastTestCount) + ' تست سال‌های قبل'));
@@ -659,21 +696,23 @@
 
   // ---------- MORE ----------
   function vMore() {
-    const items = [['help', 'راهنما', 'آموزش بخش‌ها، معرفی اپ و چک‌لیست شروع'], ['settings', 'تنظیمات', 'تاریخ آزمون، ساعت مفید روزها، تعداد تست، آستانه‌ها، نمره منفی'], ['combos', 'ترکیب‌ها', 'فعال و غیرفعال‌کردن ترکیب‌ها'], ['backup', 'پشتیبان و بازیابی', 'خروجی و ورود فایل JSON'], ['bin', 'سطل بازیافت', 'بازگرداندن موارد حذف‌شده (۳۰ روز)'], ['audit', 'تاریخچه‌ی تغییرات', 'حذف‌ها و بازگردانی‌ها'], ['selftest', 'آزمون محاسبات', 'بررسی درستی محاسبه‌ها']];
-    return top('بیشتر') + '<div class="card" id="syncbox">' + syncHtml() + '</div><div class="list" style="margin-top:12px">' + items.map(([k, t, s]) => '<button class="card tap" data-a="goMore" data-v="' + k + '"><b>' + t + '</b><div class="small muted">' + s + '</div></button>').join('') + '</div>';
+    const items = [['help', 'راهنما', 'آموزش بخش‌ها، معرفی اپ و چک‌لیست شروع'], ['settings', 'تنظیمات', 'تاریخ آزمون، ساعت مفید روزها، تعداد تست، آستانه‌ها، نمره منفی'], ['combos', 'گرایش‌ها / ترکیب‌ها', 'گروه‌های دروس و فعال‌کردن آن‌ها'], ['backup', 'پشتیبان و بازیابی', 'خروجی و ورود فایل JSON'], ['bin', 'سطل بازیافت', 'بازگرداندن موارد حذف‌شده (۳۰ روز)'], ['audit', 'تاریخچه‌ی تغییرات', 'حذف‌ها و بازگردانی‌ها'], ['selftest', 'آزمون محاسبات', 'بررسی درستی محاسبه‌ها']];
+    return top('بیشتر', esc(S.settings.examName)) + '<div class="card" id="syncbox">' + syncHtml() + '</div><div class="list" style="margin-top:12px">' + items.map(([k, t, s]) => '<button class="card tap" data-a="goMore" data-v="' + k + '"><b>' + t + '</b><div class="small muted">' + s + '</div></button>').join('') + '</div>';
   }
   function vSettings() {
     const s = S.settings; const j = L.keyToJalali(s.examDate);
     return top('تنظیمات') + '<form data-form="settings">' +
-      '<div class="card"><h3>تاریخ آزمون</h3><div class="grid4" style="grid-template-columns:1fr 1fr 1.4fr">' + num('jd', 'روز', j.jd) + num('jm', 'ماه', j.jm) + num('jy', 'سال', j.jy) + '</div></div>' +
+      '<div class="card"><h3>آزمون</h3>' + txt('examName', 'نام آزمون یا رشته', s.examName) + txt('groupLabel', 'نام گروه‌بندی دروس (مثلاً ترکیب یا گرایش)', s.groupLabel) + '</div>' +
+      '<div class="card" style="margin-top:12px"><h3>تاریخ آزمون</h3><div class="grid4" style="grid-template-columns:1fr 1fr 1.4fr">' + num('jd', 'روز', j.jd) + num('jm', 'ماه', j.jm) + num('jy', 'سال', j.jy) + '</div></div>' +
       '<div class="card" style="margin-top:12px"><h3>ساعت مفید هر روز هفته</h3>' + capacityInputs(s.capacity) + '</div>' +
       '<div class="card" style="margin-top:12px"><h3>تست</h3>' + num('testCount', 'تعداد پیش‌فرض تست هر آزمون', s.testCount) + '<div class="grid2">' + num('masteryPct', 'تسلط مطلوب از (٪)', s.masteryPct) + num('reviewPct', 'مرور هدفمند از (٪)', s.reviewPct) + '</div><p class="small muted">زیر آستانه‌ی مرور هدفمند = تکرار چرخه. پیش‌فرض برای ۲۰ تست: ۱۸ به بالا تسلط، ۱۵ تا ۱۷ مرور.</p></div>' +
       '<div class="card" style="margin-top:12px"><h3>نمره منفی</h3><label class="check"><input type="checkbox" name="negOn" ' + (s.negOn ? 'checked' : '') + '><span>محاسبه‌ی درصد با نمره منفی (فیلد «غلط» اضافه می‌شود)</span></label>' + num('negRatio', 'هر چند غلط یک صحیح را حذف می‌کند', s.negRatio) + '</div>' +
       '<div class="card" style="margin-top:12px"><h3>ظاهر</h3><label class="f"><span>حالت نمایش</span><select name="theme"><option value="auto" ' + (s.theme === 'auto' ? 'selected' : '') + '>مطابق دستگاه</option><option value="light" ' + (s.theme === 'light' ? 'selected' : '') + '>روشن</option><option value="dark" ' + (s.theme === 'dark' ? 'selected' : '') + '>تیره</option></select></label></div>' +
-      '<div id="seterr" class="err" role="alert"></div><button class="btn pri block big" style="margin-top:16px">ذخیره</button></form>';
+      '<div id="seterr" class="err" role="alert"></div><button class="btn pri block big" style="margin-top:16px">ذخیره</button></form>' +
+      '<div class="card" style="margin-top:20px"><h3>شروع با رشته یا آزمون جدید</h3><p class="small muted">همه‌ی دروس، فصل‌ها، برنامه‌ها و نتیجه‌ها پاک می‌شوند و راه‌اندازی از اول انجام می‌شود. اول پشتیبان بگیرید.</p><button class="btn danger block" data-a="resetAll">پاک کردن و شروع دوباره</button></div>';
   }
   function vCombos() {
-    return top('ترکیب‌ها', 'فقط دروس ترکیب‌های فعال در برنامه می‌آیند.') + '<div class="card">' + S.combos.map((c) => '<div class="row between" style="min-height:52px;border-bottom:1px solid var(--line)"><label class="check grow"><input type="checkbox" data-a="comboToggle" data-id="' + c.id + '" ' + (c.active ? 'checked' : '') + '><span>ترکیب ' + faD(c.code) + ' — ' + esc(c.title) + '</span></label><button class="iconbtn" data-a="comboForm" data-id="' + c.id + '" aria-label="ویرایش">' + ICON.edit + '</button></div>').join('') + '</div><button class="btn block" style="margin-top:12px" data-a="comboForm">افزودن ترکیب</button>';
+    return top(G() + '‌ها', 'فقط دروس ' + G() + '‌های فعال در برنامه می‌آیند. درسی که به هیچ ' + G() + 'ی وصل نباشد همیشه نمایش داده می‌شود.') + (S.combos.length ? '<div class="card">' + S.combos.map((c) => '<div class="row between" style="min-height:52px;border-bottom:1px solid var(--line)"><label class="check grow"><input type="checkbox" data-a="comboToggle" data-id="' + c.id + '" ' + (c.active ? 'checked' : '') + '><span>' + esc(comboLabel(c)) + (c.code && c.title ? ' — ' + esc(c.title) : '') + '</span></label><button class="iconbtn ghosti" data-a="comboForm" data-id="' + c.id + '" aria-label="ویرایش">' + ICON.edit + '</button></div>').join('') + '</div>' : '<div class="card empty">' + G() + 'ی تعریف نشده.</div>') + '<button class="btn block" style="margin-top:12px" data-a="comboForm">افزودن ' + G() + '</button>';
   }
   function vBin() {
     const items = [];
@@ -699,7 +738,7 @@
     sheet('<h2 style="margin-top:0">' + (id ? 'ویرایش درس' : 'درس جدید') + '</h2><form data-form="course" data-id="' + (id || '') + '">' + txt('name', 'نام درس', c.name) +
       '<label class="f"><span>نوع</span><select name="type"><option value="chapter" ' + (c.type !== 'test' ? 'selected' : '') + '>فصل‌به‌فصل (مطالعه + تست هر فصل)</option><option value="test" ' + (c.type === 'test' ? 'selected' : '') + '>فقط تست‌زنی (مثل زبان)</option></select></label>' +
       '<label class="f"><span>رنگ</span></label><div class="swatches">' + COLORS.map((col) => '<button type="button" data-a="swatch" data-v="' + col + '" aria-label="رنگ" aria-pressed="' + (c.color === col) + '" style="background:' + col + '"></button>').join('') + '</div><input type="hidden" name="color" value="' + esc(c.color) + '">' +
-      '<label class="f"><span>ترکیب‌ها و ضریب (اختیاری)</span></label>' + S.combos.map((cb) => '<div class="row"><label class="check grow"><input type="checkbox" name="combo_' + cb.id + '" ' + (c.combos.includes(cb.id) ? 'checked' : '') + '><span>ترکیب ' + faD(cb.code) + '</span></label><input name="coef_' + cb.id + '" inputmode="decimal" placeholder="ضریب" style="width:90px" value="' + esc(c.coef[cb.id] == null ? '' : faD(c.coef[cb.id])) + '"></div>').join('') +
+      (S.combos.length ? '<label class="f"><span>' + G() + '‌ها و ضریب (اختیاری)</span></label>' : '') + S.combos.map((cb) => '<div class="row"><label class="check grow"><input type="checkbox" name="combo_' + cb.id + '" ' + (c.combos.includes(cb.id) ? 'checked' : '') + '><span>' + esc(comboLabel(cb)) + '</span></label><input name="coef_' + cb.id + '" inputmode="decimal" placeholder="ضریب" style="width:90px" value="' + esc(c.coef[cb.id] == null ? '' : faD(c.coef[cb.id])) + '"></div>').join('') +
       (id ? '<label class="check" style="margin-top:8px"><input type="checkbox" name="archived" ' + (c.archived ? 'checked' : '') + '><span>بایگانی درس</span></label>' : '') +
       '<div id="formerr" class="err" role="alert"></div><button class="btn pri block" style="margin-top:14px">ذخیره</button>' + (id ? '<button type="button" class="btn danger block" style="margin-top:8px" data-a="delCourse" data-id="' + id + '">حذف درس</button>' : '') + '</form>');
   }
@@ -724,7 +763,7 @@
       '<label class="f"><span>وضعیت اولویت</span><select name="priority">' + Object.entries(PRI).map(([k, v]) => '<option value="' + k + '" ' + (ch.priority === k ? 'selected' : '') + '>' + v + '</option>').join('') + '</select></label>' +
       '<div id="formerr" class="err" role="alert"></div><button class="btn pri block" style="margin-top:14px">ذخیره</button>' + (id ? '<button type="button" class="btn danger block" style="margin-top:8px" data-a="delChapter" data-id="' + id + '">حذف فصل</button>' : '') + '</form>');
   }
-  function comboForm(id) { const c = id ? byId(S.combos, id) : { code: '', title: '' }; sheet('<h2 style="margin-top:0">' + (id ? 'ویرایش ترکیب' : 'ترکیب جدید') + '</h2><form data-form="combo" data-id="' + (id || '') + '">' + num('code', 'شماره ترکیب', c.code) + txt('title', 'عنوان', c.title) + '<div id="formerr" class="err" role="alert"></div><button class="btn pri block" style="margin-top:14px">ذخیره</button></form>'); }
+  function comboForm(id) { const c = id ? byId(S.combos, id) : { code: '', title: '' }; sheet('<h2 style="margin-top:0">' + (id ? 'ویرایش ' : '') + G() + (id ? '' : ' جدید') + '</h2><form data-form="combo" data-id="' + (id || '') + '">' + txt('title', 'نام', c.title) + num('code', 'شماره (اختیاری)', c.code) + '<div id="formerr" class="err" role="alert"></div><button class="btn pri block" style="margin-top:14px">ذخیره</button>' + (id ? '<button type="button" class="btn danger block" style="margin-top:8px" data-a="delCombo" data-id="' + id + '">حذف ' + G() + '</button>' : '') + '</form>'); }
   function quickForm(chId) {
     const ch = byId(S.chapters, chId); const act = activeRound(chId); const n = chapterRounds(chId).length + 1;
     sheet('<h2 style="margin-top:0">ثبت سریع</h2><div class="small muted">' + esc(ch.title) + ' · ' + (act ? 'افزودن به دور باز ' + fa(act.roundNumber) : 'دور ' + fa(n)) + '</div><form data-form="quick" data-id="' + chId + '">' +
@@ -763,10 +802,35 @@
     resetTips: () => { S.settings.seenTips = {}; save(); toast('نکته‌ها دوباره در صفحه‌ها نمایش داده می‌شوند'); },
     hideChecklist: () => { S.settings.checklistHidden = true; save(); render(); toast('از «بیشتر ← راهنما» می‌توانید دوباره نمایشش دهید'); },
     showChecklist: () => { S.settings.checklistHidden = false; save(); setTab('today'); },
-    obNext: () => { ob.err = ''; ob.step++; render(); }, obPrev: () => { ob.err = ''; ob.step--; render(); }, obFinish: () => finishOnboarding(),
+    obPreset: (el) => { const v = el.dataset.v; if (v === S.settings.preset) return; if (v === 'custom') { S.courses = []; S.combos = []; S.settings.groupLabel = 'گرایش'; S.settings.examName = ''; } else { const d = defaultState(); S.courses = d.courses; S.combos = d.combos; S.settings.groupLabel = 'ترکیب'; S.settings.examName = 'کنکور دکتری مدیریت'; } S.settings.preset = v; ob.err = ''; render(); },
+    obDelCombo: (el) => { S.combos = S.combos.filter((c) => c.id !== el.dataset.id); S.courses.forEach((c) => (c.combos = c.combos.filter((x) => x !== el.dataset.id))); render(); },
+    obType: (el) => { const c = byId(S.courses, el.dataset.id); c.type = c.type === 'test' ? 'chapter' : 'test'; render(); },
+    fab: () => { if (S.timer) return A.resumeTimer(); startSheet(); },
+    undo: () => { const f = undoFn; undoFn = null; document.querySelectorAll('.toast').forEach((x) => x.remove()); if (f) { f(); save(); render(); } },
+    courseMenu: (el) => { const c = byId(S.courses, el.dataset.id); const list = visibleCourses(); const i = list.indexOf(c);
+      menuSheet(c.name, (c.type === 'test' ? 'فقط تست' : 'فصل‌به‌فصل') + (comboNames(c) ? ' · ' + comboNames(c) : ''), [
+        cur().s !== 'course' ? ['openCourseM', 'باز کردن', 'data-id="' + c.id + '"'] : null, ['courseFormM', 'ویرایش نام، نوع، رنگ' + (S.combos.length ? ' و ' + G() : ''), 'data-id="' + c.id + '"'],
+        i > 0 ? ['moveCourse', 'انتقال به بالا', 'data-id="' + c.id + '" data-v="-1"'] : null, i >= 0 && i < list.length - 1 ? ['moveCourse', 'انتقال به پایین', 'data-id="' + c.id + '" data-v="1"'] : null,
+        ['archiveCourse', c.archived ? 'خارج کردن از بایگانی' : 'بایگانی (پنهان شود، حذف نشود)', 'data-id="' + c.id + '"'], ['delCourse', 'حذف درس', 'data-id="' + c.id + '"', true]]); },
+    openCourseM: (el) => { closeSheet(true); go('course', { id: el.dataset.id }); }, courseFormM: (el) => courseForm(el.dataset.id),
+    moveCourse: (el) => { const list = visibleCourses(); list.forEach((c, k) => (c.order = k)); const c = byId(S.courses, el.dataset.id); const i = list.indexOf(c), j = i + Number(el.dataset.v); if (j < 0 || j >= list.length) return; list[i].order = j; list[j].order = i; save(); closeSheet(true); render(); },
+    archiveCourse: (el) => { const c = byId(S.courses, el.dataset.id); c.archived = !c.archived; save(); closeSheet(true); render(); toast(c.archived ? 'بایگانی شد' : 'از بایگانی خارج شد', () => { c.archived = !c.archived; }); },
+    bookMenu: (el) => { const b = byId(S.books, el.dataset.id); menuSheet(b.title, fa(bookChapters(b.id).length) + ' فصل و زیرفصل', [cur().s !== 'book' ? ['openBookM', 'باز کردن', 'data-id="' + b.id + '"'] : null, ['bookFormM', 'ویرایش عنوان، نویسنده و درس', 'data-id="' + b.id + '"'], ['batchFormM', 'افزودن فصل‌ها (دسته‌ای)', 'data-id="' + b.id + '"'], ['delBook', 'حذف کتاب', 'data-id="' + b.id + '"', true]]); },
+    openBookM: (el) => { closeSheet(true); go('book', { id: el.dataset.id }); }, bookFormM: (el) => bookForm(el.dataset.id), batchFormM: (el) => batchForm(el.dataset.id),
+    chapterMenu: (el) => { const ch = byId(S.chapters, el.dataset.id); const ex = ch.priority === 'excluded';
+      menuSheet(ch.title, chapterState(ch).label, [cur().s !== 'chapter' ? ['openChapter', 'باز کردن', 'data-id="' + ch.id + '"'] : null, ['chapterFormM', 'ویرایش عنوان، اهمیت، زمان و اولویت', 'data-id="' + ch.id + '"'], hasKids(ch.id) ? null : ['quickFormM', 'ثبت سریع نتیجه', 'data-id="' + ch.id + '"'], ['toggleExclude', ex ? 'بازگرداندن به برنامه' : 'حذف از برنامه (بدون پاک شدن)', 'data-id="' + ch.id + '"'], ['delChapter', 'حذف فصل', 'data-id="' + ch.id + '"', true]]); },
+    chapterFormM: (el) => chapterForm(el.dataset.id), quickFormM: (el) => quickForm(el.dataset.id),
+    toggleExclude: (el) => { const ch = byId(S.chapters, el.dataset.id); const was = ch.priority; ch.priority = was === 'excluded' ? 'mid' : 'excluded'; audit('exclude', (ch.priority === 'excluded' ? 'حذف از برنامه: ' : 'بازگشت به برنامه: ') + ch.title); save(); closeSheet(true); render(); toast(ch.priority === 'excluded' ? 'از برنامه حذف شد' : 'به برنامه برگشت', () => { ch.priority = was; }); },
+    coursesBatch: () => sheet('<h2 style="margin-top:0">افزودن چند درس</h2><form data-form="coursesBatch">' + area('names', 'هر خط یک درس', '', 'ادبیات فارسی\nزبان انگلیسی\nریاضی') + '<label class="check"><input type="checkbox" name="test"><span>این دروس «فقط تست» هستند (بدون فصل)</span></label><div id="formerr" class="err" role="alert"></div><button class="btn pri block" style="margin-top:12px">افزودن</button></form>'),
+    delCombo: (el) => { const cb = byId(S.combos, el.dataset.id); confirmSheet('حذف ' + comboLabel(cb) + '؟', 'دروس حذف نمی‌شوند؛ فقط ارتباطشان با این ' + G() + ' برداشته می‌شود.', 'حذف', () => { S.combos = S.combos.filter((c) => c !== cb); S.courses.forEach((c) => { c.combos = c.combos.filter((x) => x !== cb.id); delete c.coef[cb.id]; }); save(); render(); }, true); },
+    resetAll: () => confirmSheet('همه‌ی داده‌ها پاک شود؟', 'دروس، فصل‌ها، برنامه‌ها، دورها و نتیجه‌ها برای همیشه پاک می‌شوند و راه‌اندازی از اول شروع می‌شود. اگر پشتیبان نگرفته‌اید، انصراف بزنید.', 'پاک کن و شروع کن', () => { const keep = { capacity: S.settings.capacity, theme: S.settings.theme }; S = defaultState(); Object.assign(S.settings, keep, { introDone: true }); ob = null; nav = { tab: 'today', stack: [] }; save(); render(); }, true),
+    obNext: () => { ob.err = ''; if (ob.step === 0 && S.settings.preset === 'custom' && !S.settings.examName) { ob.err = 'نام آزمون را وارد کنید.'; return render(); } if (ob.step === 2 && !S.courses.some((c) => !c.deletedAt && !c.archived)) { ob.err = 'حداقل یک درس اضافه یا انتخاب کنید.'; return render(); } ob.step++; render(); window.scrollTo(0, 0); },
+ obPrev: () => { ob.err = ''; ob.step--; render(); }, obFinish: () => finishOnboarding(),
     // plan
     week: (el) => { const d = Number(el.dataset.v); planWeek = d === 0 ? weekStart(todayKey()) : addDays(planWeek, d); render(); },
     planForm: (el) => { planForm(el.dataset.id, el.dataset.v); if (el.dataset.ch) { const f = $('.sheet form'); const ch = byId(S.chapters, el.dataset.ch); const c = chapterCourse(ch); f.courseId.value = c.id; $('#chapsel').innerHTML = chapterSelect(c.id, ch.id); } },
+    planGoS: (el) => { closeSheet(true); A.planGo(el); },
+    tabS: (el) => { closeSheet(true); setTab(el.dataset.v); },
     planGo: (el) => { const p = byId(S.plans, el.dataset.id); if (!p.chapterId) return go('course', { id: p.courseId }); const r = activeRound(p.chapterId); if (r) return go('session', { id: r.id }); startRound(p.chapterId); },
     delPlan: (el) => { S.plans = S.plans.filter((p) => p.id !== el.dataset.id); save(); closeSheet(); render(); toast('از برنامه حذف شد'); },
     copyPlan: (el) => { const from = el.dataset.v, to = el.dataset.to; const src = dayPlans(from); const have = S.plans.filter((p) => p.date === to); let n = 0; src.forEach((p) => { if (have.some((h) => h.courseId === p.courseId && h.chapterId === p.chapterId)) return; S.plans.push({ id: uid(), date: to, courseId: p.courseId, chapterId: p.chapterId, minutes: p.minutes, tests: p.tests, order: have.length + n, createdAt: nowIso() }); n++; }); save(); render(); toast(n ? fa(n) + ' مورد به ' + fmtJ(to, true) + ' کپی شد' : 'همه‌ی موارد از قبل در آن روز هست'); },
@@ -778,9 +842,9 @@
     tmode: (el) => { const f = el.closest('form'); f.mode.value = el.dataset.v; el.parentNode.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b === el)); f.querySelectorAll('[data-mode]').forEach((d) => (d.hidden = d.dataset.mode !== el.dataset.v)); liveTest(f); },
     moveCh: (el) => { const ch = byId(S.chapters, el.dataset.id); const sibs = live(S.chapters).filter((x) => x.bookId === ch.bookId && (x.parentId || null) === (ch.parentId || null)).sort((a, b) => a.order - b.order); const i = sibs.indexOf(ch), j = i + Number(el.dataset.v); if (j < 0 || j >= sibs.length) return; [sibs[i], sibs[j]] = [sibs[j], sibs[i]]; sibs.forEach((x, k) => (x.order = k)); save(); render(); },
     comboToggle: (el) => { byId(S.combos, el.dataset.id).active = el.checked; save(); },
-    delCourse: (el) => { const c = byId(S.courses, el.dataset.id); confirmSheet('حذف درس «' + c.name + '»؟', 'درس با کتاب‌ها و فصل‌هایش به سطل بازیافت می‌رود و تا ۳۰ روز قابل بازگرداندن است. سوابق زمان و تست حفظ می‌شود.', 'حذف', () => { softDelete('courses', c.id); nav.stack = []; nav.tab = 'courses'; render(); toast('به سطل بازیافت منتقل شد'); }, true); },
-    delBook: (el) => { const b = byId(S.books, el.dataset.id); confirmSheet('حذف کتاب «' + b.title + '»؟', 'کتاب و فصل‌هایش به سطل بازیافت می‌روند و تا ۳۰ روز قابل بازگرداندن‌اند.', 'حذف', () => { softDelete('books', b.id); nav.stack.pop(); render(); toast('به سطل بازیافت منتقل شد'); }, true); },
-    delChapter: (el) => { const ch = byId(S.chapters, el.dataset.id); confirmSheet('حذف فصل «' + ch.title + '»؟', 'فصل' + (hasKids(ch.id) ? ' و زیرفصل‌هایش' : '') + ' به سطل بازیافت می‌رود و تا ۳۰ روز قابل بازگرداندن است. داده‌ی دورها حفظ می‌شود.', 'حذف', () => { softDelete('chapters', ch.id); if (cur().s === 'chapter') nav.stack.pop(); render(); toast('به سطل بازیافت منتقل شد'); }, true); },
+    delCourse: (el) => { const c = byId(S.courses, el.dataset.id); confirmSheet('حذف درس «' + c.name + '»؟', 'درس با کتاب‌ها و فصل‌هایش به سطل بازیافت می‌رود و تا ۳۰ روز قابل بازگرداندن است. سوابق زمان و تست حفظ می‌شود.', 'حذف', () => { const at = softDelete('courses', c.id); nav.stack = []; nav.tab = 'courses'; render(); toast('«' + c.name + '» حذف شد', () => restoreAt('courses', c.id, at)); }, true); },
+    delBook: (el) => { const b = byId(S.books, el.dataset.id); confirmSheet('حذف کتاب «' + b.title + '»؟', 'کتاب و فصل‌هایش به سطل بازیافت می‌روند و تا ۳۰ روز قابل بازگرداندن‌اند.', 'حذف', () => { const at = softDelete('books', b.id); if (cur().s === 'book') nav.stack.pop(); render(); toast('«' + b.title + '» حذف شد', () => restoreAt('books', b.id, at)); }, true); },
+    delChapter: (el) => { const ch = byId(S.chapters, el.dataset.id); confirmSheet('حذف فصل «' + ch.title + '»؟', 'فصل' + (hasKids(ch.id) ? ' و زیرفصل‌هایش' : '') + ' به سطل بازیافت می‌رود و تا ۳۰ روز قابل بازگرداندن است. داده‌ی دورها حفظ می‌شود.', 'حذف', () => { const at = softDelete('chapters', ch.id); if (cur().s === 'chapter') nav.stack.pop(); render(); toast('«' + ch.title + '» حذف شد', () => restoreAt('chapters', ch.id, at)); }, true); },
     restore: (el) => { const x = byId(S[el.dataset.v], el.dataset.id); const at = x.deletedAt; x.deletedAt = null;
       if (el.dataset.v === 'courses') S.books.filter((b) => b.courseId === x.id && b.deletedAt === at).forEach((b) => { b.deletedAt = null; S.chapters.filter((c) => c.bookId === b.id && c.deletedAt === at).forEach((c) => (c.deletedAt = null)); });
       if (el.dataset.v === 'books') S.chapters.filter((c) => c.bookId === x.id && c.deletedAt === at).forEach((c) => (c.deletedAt = null));
@@ -836,7 +900,29 @@
     if (kind === 'chapters') S.chapters.filter((c) => c.parentId === id && !c.deletedAt).forEach((c) => (c.deletedAt = at));
     if (S.timer && S.timer.roundId) { const r = byId(S.rounds, S.timer.roundId); const ch = r && byId(S.chapters, r.chapterId); if (ch && ch.deletedAt) S.timer = null; }
     audit('delete', 'حذف ' + ({ courses: 'درس', books: 'کتاب', chapters: 'فصل' })[kind] + ': ' + (x.name || x.title)); save();
+    return at;
   }
+  function restoreAt(kind, id, at) {
+    const x = byId(S[kind], id); if (!x) return; x.deletedAt = null;
+    if (kind === 'courses') S.books.filter((b) => b.courseId === id && b.deletedAt === at).forEach((b) => { b.deletedAt = null; S.chapters.filter((c) => c.bookId === b.id && c.deletedAt === at).forEach((c) => (c.deletedAt = null)); });
+    if (kind === 'books') S.chapters.filter((c) => c.bookId === id && c.deletedAt === at).forEach((c) => (c.deletedAt = null));
+    if (kind === 'chapters') S.chapters.filter((c) => c.parentId === id && c.deletedAt === at).forEach((c) => (c.deletedAt = null));
+    audit('restore', 'بازگرداندن: ' + (x.name || x.title));
+  }
+  function startSheet() {
+    const tk = todayKey(); const plans = dayPlans(tk).filter((p) => !planDone(p));
+    const open = S.rounds.filter((r) => r.status === 'active' && byId(S.chapters, r.chapterId) && !byId(S.chapters, r.chapterId).deletedAt);
+    const row = (a, id, t, sub, color) => '<button class="mi" data-a="' + a + '" data-id="' + id + '"><span class="cdot" style="background:' + esc(color) + '"></span><span class="grow" style="min-width:0"><b>' + esc(t) + '</b><br><span class="small muted">' + sub + '</span></span></button>';
+    let h = '<h2 style="margin-top:0">شروع مطالعه</h2>';
+    if (open.length) h += '<div class="small muted" style="margin:8px 0 4px">دورهای باز</div><div class="menu">' + open.map((r) => { const ch = byId(S.chapters, r.chapterId); const c = chapterCourse(ch); return row('openSession', r.id, ch.title, esc(c.name) + ' · دور ' + fa(r.roundNumber) + ' · ' + STEP_LABEL[r.step], c.color); }).join('') + '</div>';
+    if (plans.length) h += '<div class="small muted" style="margin:12px 0 4px">برنامه‌ی امروز</div><div class="menu">' + plans.map((p) => { const lb = planLabel(p); return row('planGoS', p.id, lb.title, esc(lb.sub) + (p.minutes ? ' · ' + fa(p.minutes) + ' دقیقه' : ''), lb.color); }).join('') + '</div>';
+    const sug = activeChapters().filter((ch) => chapterState(ch).key === 'new').slice(0, 4);
+    if (!open.length && !plans.length && sug.length) h += '<div class="small muted" style="margin:12px 0 4px">فصل‌های شروع‌نشده</div><div class="menu">' + sug.map((ch) => { const c = chapterCourse(ch); return row('openChapter', ch.id, ch.title, esc(c.name), c.color); }).join('') + '</div>';
+    if (!open.length && !plans.length && !sug.length) h += '<p class="muted">هنوز فصلی برای شروع ندارید. از «درس‌ها» کتاب و فصل اضافه کنید.</p><button class="btn pri block" data-a="tabS" data-v="courses">رفتن به درس‌ها</button>';
+    h += '<button class="btn block" style="margin-top:12px" data-a="closeSheet">بستن</button>';
+    sheet(h);
+  }
+
   function addChapters(bookId, items) {
     let order = live(S.chapters).filter((c) => c.bookId === bookId && !c.parentId).length; let parent = null, subOrder = 0; const t = nowIso();
     for (const it of items) {
@@ -844,6 +930,12 @@
       if (it.level === 1 && parent) { ch.parentId = parent.id; ch.order = subOrder++; } else { ch.order = order++; parent = ch; subOrder = 0; }
       S.chapters.push(ch);
     }
+  }
+  function addCoursesFromText(text, isTest) {
+    const names = String(text || '').split('\n').map((x) => x.trim().replace(/^[-*•–]\s*/, '')).filter(Boolean); const t = nowIso(); let n = 0;
+    const maxO = Math.max(-1, ...S.courses.map((c) => (c.order == null ? -1 : c.order)));
+    names.forEach((name) => { if (S.courses.some((c) => !c.deletedAt && c.name === name)) return; S.courses.push({ id: uid(), name, type: isTest ? 'test' : 'chapter', color: COLORS[S.courses.length % COLORS.length], combos: S.combos.filter((x) => x.active).map((x) => x.id), coef: {}, archived: false, order: maxO + 1 + n, createdAt: t, updatedAt: t, deletedAt: null }); n++; });
+    return n;
   }
   function finishOnboarding() { S.settings.onboarded = true; ob = null; nav = { tab: 'today', stack: [] }; save(); render(); }
   function tryImport(text) {
@@ -856,6 +948,10 @@
 
   // ---------- form submit ----------
   const F = {
+    obExam: (f) => { const v = f.examName.value.trim(); if (!v) { ob.err = 'نام آزمون را وارد کنید.'; return render(); } S.settings.examName = v; ob.err = ''; ob.step++; render(); },
+    obAddCombo: (f) => { const t = f.t.value.trim(); if (!t) return; const code = /^[0-9۰-۹]+$/.test(t) ? L.toEnDigits(t) : ''; S.combos.push({ id: uid(), code, title: code ? '' : t, active: true }); render(); },
+    obAddCourses: (f) => { addCoursesFromText(f.names.value, f.test.checked); ob.err = ''; render(); },
+    coursesBatch: (f) => { const n = addCoursesFromText(f.names.value, f.test.checked); if (!n) return ($('#formerr', f).textContent = 'حداقل یک نام درس بنویسید.'); save(); closeSheet(); render(); toast(fa(n) + ' درس اضافه شد'); },
     obDate: (f) => { const d = L.parseIntSafe(f.jd.value), m = L.parseIntSafe(f.jm.value), y = L.parseIntSafe(f.jy.value); if (!L.isValidJalali(y, m, d)) { ob.err = 'تاریخ شمسی معتبر نیست.'; return render(); } const cap = readCapacity(f); if (!cap) { ob.err = 'ساعت مفید هر روز باید عددی بین ۰ تا ۱۸ باشد.'; return render(); } S.settings.examDate = L.jalaliToKey(y, m, d); S.settings.capacity = cap; ob.err = ''; ob.step++; render(); },
     obBook: (f) => { const v = formVals(f); if (!v.title.trim()) { ob.err = 'عنوان کتاب را وارد کنید.'; return render(); } const b = { id: uid(), courseId: v.courseId, title: v.title.trim(), author: '', createdAt: nowIso(), updatedAt: nowIso(), deletedAt: null }; S.books.push(b); addChapters(b.id, L.parseBatch(v.batch)); finishOnboarding(); },
     plan: (f) => {
@@ -899,7 +995,7 @@
       if (v.priority === 'excluded' && was !== 'excluded') { confirmSheet('حذف این فصل از برنامه؟', 'فصل حذف نمی‌شود؛ فقط در برنامه و آمار پوشش نمی‌آید. با تغییر اولویت برمی‌گردد.', 'حذف از برنامه', () => { apply(); audit('exclude', 'حذف از برنامه: ' + v.title.trim()); save(); }); return; }
       apply();
     },
-    combo: (f) => { const v = formVals(f); const code = L.toEnDigits(v.code).trim(); const err = $('#formerr', f); if (!code) return (err.textContent = 'شماره ترکیب را وارد کنید.'); if (S.combos.find((c) => c.code === code && c.id !== f.dataset.id)) return (err.textContent = 'این شماره قبلاً ثبت شده.'); if (f.dataset.id) Object.assign(byId(S.combos, f.dataset.id), { code, title: v.title.trim() }); else S.combos.push({ id: uid(), code, title: v.title.trim(), active: true }); save(); closeSheet(); render(); },
+    combo: (f) => { const v = formVals(f); const code = L.toEnDigits(v.code).trim(); const err = $('#formerr', f); if (!code && !v.title.trim()) return (err.textContent = 'نام را وارد کنید.'); if (code && S.combos.find((c) => c.code === code && c.id !== f.dataset.id)) return (err.textContent = 'این شماره قبلاً ثبت شده.'); if (f.dataset.id) Object.assign(byId(S.combos, f.dataset.id), { code, title: v.title.trim() }); else S.combos.push({ id: uid(), code, title: v.title.trim(), active: true }); save(); closeSheet(); render(); },
     tEdit: (f) => { const m = L.parseNum(f.min.value); if (m == null || Number.isNaN(m) || m < 0 || m > 1440) return ($('#formerr', f).textContent = 'عدد بین ۰ تا ۱۴۴۰ وارد کنید.'); const t = S.timer; if (!t) return closeSheet(); t.accMs = Math.round(m * 60000); t.startedAt = Date.now(); t.manual = true; save(); closeSheet(); render(); toast('زمان ویرایش شد'); },
     testSave: (f) => {
       const r = byId(S.rounds, f.dataset.id); const n = readTest(f); const err = $('#testerr', f); if (!n.ok) return (err.textContent = n.msg);
@@ -943,7 +1039,8 @@
       if (Object.values(v).some(Number.isNaN)) return (err.textContent = 'یکی از مقادیر خارج از محدوده است.');
       if (v.reviewPct > v.masteryPct) return (err.textContent = 'آستانه‌ی مرور هدفمند نباید از تسلط بیشتر باشد.');
       v.testCount = Math.round(v.testCount);
-      Object.assign(S.settings, v, { capacity: cap, examDate: L.jalaliToKey(y, m, d), negOn: f.negOn.checked, theme: f.theme.value }); save(); render(); toast('تنظیمات ذخیره شد');
+      const en = f.examName.value.trim(); if (!en) return (err.textContent = 'نام آزمون را وارد کنید.');
+      Object.assign(S.settings, v, { examName: en, groupLabel: f.groupLabel.value.trim() || 'گروه', capacity: cap, examDate: L.jalaliToKey(y, m, d), negOn: f.negOn.checked, theme: f.theme.value }); save(); render(); toast('تنظیمات ذخیره شد');
     },
   };
 
@@ -1005,7 +1102,7 @@
       });
       NB.App.addListener('resume', () => { tick(); render(); });
       const paint = () => { const dark = document.documentElement.getAttribute('data-theme') === 'dark' || (document.documentElement.getAttribute('data-theme') !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
-        NB.StatusBar.setStyle({ style: dark ? 'DARK' : 'LIGHT' }).catch(() => {}); NB.StatusBar.setBackgroundColor({ color: dark ? '#0E0E0D' : '#F5F4F0' }).catch(() => {}); };
+        NB.StatusBar.setStyle({ style: dark ? 'DARK' : 'LIGHT' }).catch(() => {}); NB.StatusBar.setBackgroundColor({ color: dark ? '#0B1020' : '#EEF2FB' }).catch(() => {}); };
       paint(); const ap = applyTheme; applyTheme = function () { ap(); paint(); };
     } catch (e) { console.error(e); }
   }

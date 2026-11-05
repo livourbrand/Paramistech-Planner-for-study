@@ -13,7 +13,7 @@ const html = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#1F5E57">
+<meta name="theme-color" content="#2F4EBF">
 <title>اپلیکیشن درسی پارامیس تک</title>
 <style>${font}${css}</style>
 </head>
