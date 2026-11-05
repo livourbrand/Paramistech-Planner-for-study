@@ -1,0 +1,76 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install and build web assets
+        run: |
+          npm ci
+          node build-web.mjs
+          npx cap sync android
+
+      - name: Restore signing key
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > android/app/release.jks
+            echo "SIGNED=1" >> "$GITHUB_ENV"
+          else
+            echo "No signing key secret; building a debug APK instead."
+          fi
+
+      - name: Build APK
+        working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: paramis
+        run: |
+          chmod +x gradlew
+          if [ "$SIGNED" = "1" ]; then
+            ./gradlew --no-daemon assembleRelease
+            cp app/build/outputs/apk/release/app-release.apk ../ParamisTechStudy-1.0.${VERSION_CODE}.apk
+          else
+            ./gradlew --no-daemon assembleDebug
+            cp app/build/outputs/apk/debug/app-debug.apk ../ParamisTechStudy-1.0.${VERSION_CODE}-debug.apk
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ParamisTechStudy-apk
+          path: ParamisTechStudy-*.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Paramis Tech Study 1.0.${{ github.run_number }}
+          body: |
+            اپلیکیشن درسی پارامیس تک — نسخه‌ی 1.0.${{ github.run_number }}
+            فایل APK زیر را روی گوشی اندروید دانلود و نصب کنید.
+          files: ParamisTechStudy-*.apk

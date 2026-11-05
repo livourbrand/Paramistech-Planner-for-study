@@ -1,0 +1,14 @@
+{
+  "appId": "tech.paramis.study",
+  "appName": "Paramis Tech Study",
+  "webDir": "www",
+  "backgroundColor": "#F5F4F0",
+  "android": {
+    "adjustMarginsForEdgeToEdge": "auto",
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "StatusBar": { "overlaysWebView": false, "backgroundColor": "#F5F4F0", "style": "LIGHT" }
+  }
+}
