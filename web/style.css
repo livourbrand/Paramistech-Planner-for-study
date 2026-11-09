@@ -166,3 +166,11 @@ details.card[open]>summary::after{content:'−'}
 .plan{position:relative}
 .plan.best{outline:2px solid var(--acc)}
 .plan .badge{position:absolute;top:-10px;left:16px;background:#FF5A7A;color:#fff;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px}
+.locked{position:relative;border-radius:var(--r);overflow:hidden}
+.locked .lc{filter:blur(6px);opacity:.75;pointer-events:none;user-select:none}
+.locked .lo{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:16px;background:linear-gradient(0deg,rgba(238,242,251,.55),rgba(238,242,251,.55))}
+:root[data-theme="dark"] .locked .lo{background:rgba(11,16,32,.55)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .locked .lo{background:rgba(11,16,32,.55)}}
+.locked .lo b{font-size:14px;max-width:260px}
+.quota{display:block;width:100%;text-align:right;border:0;background:var(--card);border-radius:var(--r-s);padding:10px 14px;margin-bottom:12px;box-shadow:var(--shadow);font:inherit;color:var(--ink);cursor:pointer}
+.quota>span:first-child{display:block;font-size:13px;margin-bottom:6px}

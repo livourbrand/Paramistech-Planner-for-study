@@ -407,7 +407,7 @@
     const Q = [
       ['شروع سریع', '۱) در «درس‌ها» برای هر درس کتاب بسازید و فهرست فصل‌ها را بچسبانید. ۲) در «برنامه» برای روزها فصل و زمان هدف بگذارید. ۳) در «امروز» روی «شروع دور» بزنید. ۴) بعد از چند دور، در صفحه‌ی هر فصل پیشرفت را ببینید.'],
       ['برنامه چیست؟', 'هر آزمون و هر گرایش یک «برنامه»‌ی جداست؛ مثلاً «دکتری مدیریت · ترکیب ۵». دروس، فصل‌ها، برنامه‌ی هفتگی و نتیجه‌های هر برنامه جدا نگه داشته می‌شود. از بالای صفحه‌ی «امروز» بین برنامه‌ها جابه‌جا شوید.'],
-      ['پلن رایگان و پیشرفته', 'پلن رایگان: یک برنامه با همه‌ی امکانات. پلن پیشرفته: برنامه‌های نامحدود؛ ماهانه ' + fa(PRICE.monthly) + ' تومان یا سالانه ' + fa(PRICE.yearly) + ' تومان (۵۰٪ تخفیف). پرداخت و لغو اشتراک از طریق کافه بازار است.'],
+      ['پلن رایگان و پیشرفته', 'پلن رایگان: یک برنامه با حداکثر ' + fa(FREE_COURSES) + ' درس و آمار پایه. پلن پیشرفته: برنامه‌ها و درس‌های نامحدود و آمار کامل؛ ماهانه ' + fa(PRICE.monthly) + ' تومان یا سالانه ' + fa(PRICE.yearly) + ' تومان (۵۰٪ تخفیف). پرداخت و لغو اشتراک از طریق کافه بازار است.'],
       ['دور چیست؟', 'هر بار که یک فصل را از اول تا آخر می‌خوانید و تست می‌زنید یک «دور» است. دور ۱ اولین مطالعه است و دورهای بعدی مرور. داده‌ی هر دور جدا ذخیره می‌شود و دورهای قبلی هرگز تغییر نمی‌کنند.'],
       ['چرخه‌ی داخل دور', 'اگر نتیجه‌ی تست راضی‌کننده نبود، «مطالعه‌ی مجدد و تست جدید» در همان دور یک چرخه‌ی دیگر می‌سازد. در مقایسه‌ی دورها، درصد آخرین تست هر دور ملاک است.'],
       ['زمان‌سنج', 'زمان‌سنج بر اساس ساعت شروع کار می‌کند، پس با بستن اپ یا قفل شدن صفحه دقیق می‌ماند. هم‌زمان فقط یک زمان‌سنج فعال است. «مکث» و «ویرایش دستی» برای وقفه‌ها و اصلاح زمان است.'],
@@ -508,6 +508,7 @@
     const vis = visibleCourses(); const hidden = S.courses.filter((c) => !c.deletedAt && !courseVisible(c)); const act = S.combos.filter((c) => c.active);
     let h = top('درس‌ها', esc(S.settings.examName) + (S.combos.length ? ' · ' + G() + ': ' + (act.length ? act.map((c) => esc(c.code ? faD(c.code) : c.title)).join('، ') : 'هیچ') : ''));
     h += '<div class="row" style="margin-bottom:12px"><button class="btn pri grow" data-a="courseForm">درس جدید</button><button class="btn grow" data-a="coursesBatch">افزودن چند درس</button></div>';
+    if (!isPro()) h += '<button class="quota" data-a="goPro"><span>' + fa(courseCount()) + ' از ' + fa(FREE_COURSES) + ' درس پلن رایگان</span>' + bar(courseCount(), FREE_COURSES, courseCount() >= FREE_COURSES ? 'var(--warn)' : null) + '<span class="small" style="color:var(--acc)">' + (courseCount() >= FREE_COURSES ? 'درس بیشتر با پلن پیشرفته' : '') + '</span></button>';
     h += tip('courses');
     h += '<div class="list">' + vis.map((c) => {
       let sub, prog = '';
@@ -700,6 +701,10 @@
   }
 
   // ---------- STATS ----------
+  function proLock(title, inner, what) {
+    if (isPro()) return '<h2>' + title + '</h2>' + inner;
+    return '<h2 class="row" style="gap:8px">' + title + ' ' + chip('پیشرفته', 'warn') + '</h2><div class="locked"><div class="lc" aria-hidden="true" inert>' + inner + '</div><div class="lo"><svg viewBox="0 0 64 64" width="34" height="34" aria-hidden="true"><rect x="12" y="28" width="40" height="30" rx="9" fill="#FFD166"/><path d="M20 28 v-8 a12 12 0 0 1 24 0 v8" fill="none" stroke="#2F4EBF" stroke-width="6" stroke-linecap="round"/><circle cx="32" cy="42" r="5" fill="#2F4EBF"/></svg><b>' + what + '</b><button class="btn pri sm" data-a="goPro">دیدن در پلن پیشرفته</button></div></div>';
+  }
   function vStats() {
     const tk = todayKey(); const all = activeChapters(); const covered = all.filter((ch) => chapterRounds(ch.id).some((r) => r.status === 'done'));
     const second = all.filter((ch) => chapterRounds(ch.id).filter((r) => r.status === 'done').length >= 2);
@@ -710,20 +715,21 @@
     // last 14 days: plan vs actual
     const days = [...Array(14)].map((_, i) => addDays(tk, i - 13));
     const rows = days.map((d) => ({ d, a: dayActual(d).sec / 60, p: dayPlans(d).reduce((x, p) => x + (p.minutes || 0), 0) }));
-    h += '<h2>۱۴ روز اخیر: برنامه و انجام‌شده</h2><div class="card">' + daysChart(rows) + '</div>';
+    h += proLock('۱۴ روز اخیر: برنامه و انجام‌شده', '<div class="card">' + daysChart(rows) + '</div>', 'نمودار روزانه‌ی برنامه در برابر انجام‌شده');
     // per course
     const cs = visibleCourses();
-    h += '<h2>هر درس</h2><div class="card tscroll" style="padding:4px 10px"><table><thead><tr><th>درس</th><th>زمان</th><th>تست</th><th>درصد</th><th>پوشش</th></tr></thead><tbody>' + cs.map((c) => {
+    h += proLock('هر درس', '<div class="card tscroll" style="padding:4px 10px"><table><thead><tr><th>درس</th><th>زمان</th><th>تست</th><th>درصد</th><th>پوشش</th></tr></thead><tbody>' + cs.map((c) => {
       const sec = S.sessions.filter((s) => s.courseId === c.id).reduce((a, s) => a + s.durationSec, 0); const tl = []; S.rounds.filter((r) => r.courseId === c.id).forEach((r) => r.tests.forEach((t) => tl.push(t))); S.langLogs.filter((l) => l.courseId === c.id).forEach((l) => tl.push(l)); const s = L.sumTests(tl);
       const chs = c.type === 'test' ? null : courseChapters(c.id); const cov = chs ? chs.filter((ch) => chapterRounds(ch.id).some((r) => r.status === 'done')).length : null;
       return '<tr data-a="openCourse" data-id="' + c.id + '" style="cursor:pointer"><td style="white-space:normal;min-width:120px"><span class="dot" style="background:' + esc(c.color) + ';margin-left:6px"></span>' + esc(c.name) + '</td><td>' + fmtDur(sec) + '</td><td>' + fa(s.count) + '</td><td>' + pctTxt(s.count ? L.pctRaw(s.correct, s.count) : null) + '</td><td>' + (chs ? fa(cov) + '/' + fa(chs.length) : '—') + '</td></tr>';
-    }).join('') + '</tbody></table></div>';
+    }).join('') + '</tbody></table></div>', 'زمان، تعداد تست، درصد و پوشش هر درس');
     // weakest chapters
     const scored = all.map((ch) => { const rs = chapterRounds(ch.id).filter((r) => r.tests.length); const l = rs[rs.length - 1]; return l ? { ch, pct: roundSummary(l).pct, n: rs.length } : null; }).filter((x) => x && x.pct != null).sort((a, b) => a.pct - b.pct);
-    if (scored.length) {
+    {
       const row = (x) => '<div class="kv" data-a="openChapter" data-id="' + x.ch.id + '" role="button" tabindex="0" style="cursor:pointer;min-height:44px;align-items:center"><span class="grow" style="min-width:0">' + esc(x.ch.title) + ' <span class="small muted">· ' + esc(chapterCourse(x.ch).name) + ' · دور ' + fa(x.n) + '</span></span><b class="num">' + pctTxt(x.pct) + '</b></div>';
-      h += '<h2>ضعیف‌ترین فصل‌ها</h2><div class="card" style="padding:4px 14px">' + scored.slice(0, 6).map(row).join('') + '</div>';
-      if (scored.length > 6) h += '<h2>قوی‌ترین فصل‌ها</h2><div class="card" style="padding:4px 14px">' + scored.slice(-5).reverse().map(row).join('') + '</div>';
+      const sample = [['فصل ۲: برنامه‌ریزی', 48], ['فصل ۴: رهبری', 55], ['فصل ۱: مفاهیم', 62]].map(([t, p]) => '<div class="kv"><span class="grow">' + t + '</span><b class="num">' + fa(p) + '٪</b></div>').join('');
+      if (scored.length || !isPro()) h += proLock('ضعیف‌ترین فصل‌ها', '<div class="card" style="padding:4px 14px">' + (scored.length ? scored.slice(0, 6).map(row).join('') : sample) + '</div>', 'فصل‌هایی که بیشترین نیاز به مرور دارند');
+      if (scored.length > 6 && isPro()) h += '<h2>قوی‌ترین فصل‌ها</h2><div class="card" style="padding:4px 14px">' + scored.slice(-5).reverse().map(row).join('') + '</div>';
     }
     h += '<button class="btn block" style="margin-top:16px" data-a="goStats" data-v="sessions">همه‌ی جلسه‌ها</button>';
     return h;
@@ -747,7 +753,7 @@
 
   // ---------- MORE ----------
   function vMore() {
-    const items = [['programs', 'برنامه‌های من', fa(ROOT.programs.length) + ' برنامه · هر آزمون و گرایش یک برنامه'], ['pro', isPro() ? 'پلن پیشرفته · فعال' : 'پلن پیشرفته', isPro() ? 'برنامه‌های نامحدود فعال است' : 'برنامه‌های نامحدود؛ ماهانه یا سالانه با ۵۰٪ تخفیف'], ['help', 'راهنما', 'آموزش ساده‌ی بخش‌ها، معرفی اپ و چک‌لیست شروع'], ['settings', 'تنظیمات', 'تاریخ آزمون، ساعت مفید روزها، تعداد تست، آستانه‌ها، نمره منفی'], S.combos.length ? ['combos', 'گروه‌های دروس', 'فعال‌کردن گروه‌های دروس این برنامه'] : null, ['backup', 'پشتیبان و بازیابی', 'خروجی و ورود فایل JSON'], ['bin', 'سطل بازیافت', 'بازگرداندن موارد حذف‌شده (۳۰ روز)'], ['audit', 'تاریخچه‌ی تغییرات', 'حذف‌ها و بازگردانی‌ها'], ['selftest', 'آزمون محاسبات', 'بررسی درستی محاسبه‌ها']];
+    const items = [['programs', 'برنامه‌های من', fa(ROOT.programs.length) + ' برنامه · هر آزمون و گرایش یک برنامه'], ['pro', isPro() ? 'پلن پیشرفته · فعال' : 'پلن پیشرفته', isPro() ? 'برنامه‌های نامحدود فعال است' : 'برنامه و درس نامحدود، آمار کامل؛ سالانه با ۵۰٪ تخفیف'], ['help', 'راهنما', 'آموزش ساده‌ی بخش‌ها، معرفی اپ و چک‌لیست شروع'], ['settings', 'تنظیمات', 'تاریخ آزمون، ساعت مفید روزها، تعداد تست، آستانه‌ها، نمره منفی'], S.combos.length ? ['combos', 'گروه‌های دروس', 'فعال‌کردن گروه‌های دروس این برنامه'] : null, ['backup', 'پشتیبان و بازیابی', 'خروجی و ورود فایل JSON'], ['bin', 'سطل بازیافت', 'بازگرداندن موارد حذف‌شده (۳۰ روز)'], ['audit', 'تاریخچه‌ی تغییرات', 'حذف‌ها و بازگردانی‌ها'], ['selftest', 'آزمون محاسبات', 'بررسی درستی محاسبه‌ها']];
     return top('بیشتر', esc(S.settings.examName)) + '<div class="card" id="syncbox">' + syncHtml() + '</div><div class="list" style="margin-top:12px">' + items.filter(Boolean).map(([k, t, s]) => '<button class="card tap" data-a="goMore" data-v="' + k + '"><b>' + t + '</b><div class="small muted">' + s + '</div></button>').join('') + '</div>';
   }
   function vSettings() {
@@ -884,7 +890,7 @@
       menuSheet(ch.title, chapterState(ch).label, [cur().s !== 'chapter' ? ['openChapter', 'باز کردن', 'data-id="' + ch.id + '"'] : null, ['chapterFormM', 'ویرایش عنوان، اهمیت، زمان و اولویت', 'data-id="' + ch.id + '"'], hasKids(ch.id) ? null : ['quickFormM', 'ثبت سریع نتیجه', 'data-id="' + ch.id + '"'], ['toggleExclude', ex ? 'بازگرداندن به برنامه' : 'حذف از برنامه (بدون پاک شدن)', 'data-id="' + ch.id + '"'], ['delChapter', 'حذف فصل', 'data-id="' + ch.id + '"', true]]); },
     chapterFormM: (el) => chapterForm(el.dataset.id), quickFormM: (el) => quickForm(el.dataset.id),
     toggleExclude: (el) => { const ch = byId(S.chapters, el.dataset.id); const was = ch.priority; ch.priority = was === 'excluded' ? 'mid' : 'excluded'; audit('exclude', (ch.priority === 'excluded' ? 'حذف از برنامه: ' : 'بازگشت به برنامه: ') + ch.title); save(); closeSheet(true); render(); toast(ch.priority === 'excluded' ? 'از برنامه حذف شد' : 'به برنامه برگشت', () => { ch.priority = was; }); },
-    coursesBatch: () => sheet('<h2 style="margin-top:0">افزودن چند درس</h2><form data-form="coursesBatch">' + area('names', 'هر خط یک درس', '', 'ادبیات فارسی\nزبان انگلیسی\nریاضی') + '<label class="check"><input type="checkbox" name="test"><span>این دروس «فقط تست» هستند (بدون فصل)</span></label><div id="formerr" class="err" role="alert"></div><button class="btn pri block" style="margin-top:12px">افزودن</button></form>'),
+    coursesBatch: () => courseRoom() <= 0 ? limitSheet() : sheet('<h2 style="margin-top:0">افزودن چند درس</h2><form data-form="coursesBatch">' + area('names', 'هر خط یک درس', '', 'ادبیات فارسی\nزبان انگلیسی\nریاضی') + '<label class="check"><input type="checkbox" name="test"><span>این دروس «فقط تست» هستند (بدون فصل)</span></label><div id="formerr" class="err" role="alert"></div><button class="btn pri block" style="margin-top:12px">افزودن</button></form>'),
     delCombo: (el) => { const cb = byId(S.combos, el.dataset.id); confirmSheet('حذف ' + comboLabel(cb) + '؟', 'دروس حذف نمی‌شوند؛ فقط ارتباطشان با این ' + G() + ' برداشته می‌شود.', 'حذف', () => { S.combos = S.combos.filter((c) => c !== cb); S.courses.forEach((c) => { c.combos = c.combos.filter((x) => x !== cb.id); delete c.coef[cb.id]; }); save(); render(); }, true); },
     resetAll: () => confirmSheet('داده‌های این برنامه پاک شود؟', 'دروس، فصل‌ها، برنامه‌ی هفتگی، دورها و نتیجه‌های «' + esc(curProgram().title) + '» برای همیشه پاک می‌شوند. اگر پشتیبان نگرفته‌اید، انصراف بزنید.', 'پاک کن', () => { S = newProgramState(); ROOT.data[ROOT.active] = S; ob = null; nav = { tab: 'today', stack: [] }; save(); render(); }, true),
     obNext: () => { ob.err = ''; if (ob.step === 0 && !S.settings.preset) { ob.err = 'یکی از گزینه‌ها را انتخاب کنید.'; return render(); } if (ob.step === 1 && !S.courses.some((c) => !c.deletedAt && !c.archived)) { ob.err = 'حداقل یک درس اضافه یا انتخاب کنید.'; return render(); } ob.step++; render(); window.scrollTo(0, 0); },
@@ -898,7 +904,7 @@
     delPlan: (el) => { S.plans = S.plans.filter((p) => p.id !== el.dataset.id); save(); closeSheet(); render(); toast('از برنامه حذف شد'); },
     copyPlan: (el) => { const from = el.dataset.v, to = el.dataset.to; const src = dayPlans(from); const have = S.plans.filter((p) => p.date === to); let n = 0; src.forEach((p) => { if (have.some((h) => h.courseId === p.courseId && h.chapterId === p.chapterId)) return; S.plans.push({ id: uid(), date: to, courseId: p.courseId, chapterId: p.chapterId, minutes: p.minutes, tests: p.tests, order: have.length + n, createdAt: nowIso() }); n++; }); save(); render(); toast(n ? fa(n) + ' مورد به ' + fmtJ(to, true) + ' کپی شد' : 'همه‌ی موارد از قبل در آن روز هست'); },
     // structure
-    courseForm: (el) => courseForm(el.dataset.id), bookForm: (el) => bookForm(el.dataset.id, el.dataset.course), batchForm: (el) => batchForm(el.dataset.id),
+    courseForm: (el) => { if (!el.dataset.id && courseRoom() <= 0) return limitSheet(); courseForm(el.dataset.id); }, bookForm: (el) => bookForm(el.dataset.id, el.dataset.course), batchForm: (el) => batchForm(el.dataset.id),
     chapterForm: (el) => chapterForm(el.dataset.id, el.dataset.book), comboForm: (el) => comboForm(el.dataset.id), quickForm: (el) => quickForm(el.dataset.id),
     swatch: (el) => { const f = el.closest('form'); f.color.value = el.dataset.v; f.querySelectorAll('.swatches button').forEach((b) => b.setAttribute('aria-pressed', b === el)); },
     scale: (el) => { const seg = el.closest('[data-scale]'); seg.nextElementSibling.value = el.dataset.v; seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b === el)); },
@@ -1027,10 +1033,17 @@
       S.chapters.push(ch);
     }
   }
+  const FREE_COURSES = 5;
+  const courseCount = () => S.courses.filter((c) => !c.deletedAt).length;
+  const courseRoom = () => (isPro() ? Infinity : Math.max(0, FREE_COURSES - courseCount()));
+  let lastBlocked = 0;
+  function limitSheet() {
+    sheet('<div style="text-align:center"><svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true"><rect x="12" y="28" width="40" height="30" rx="9" fill="#FFD166"/><path d="M20 28 v-8 a12 12 0 0 1 24 0 v8" fill="none" stroke="#2F4EBF" stroke-width="6" stroke-linecap="round"/><circle cx="32" cy="42" r="5" fill="#2F4EBF"/></svg><h2 style="margin:8px 0 4px">سقف ' + fa(FREE_COURSES) + ' درس پلن رایگان</h2><p class="muted">در پلن رایگان هر برنامه تا ' + fa(FREE_COURSES) + ' درس دارد. برای درس‌های بیشتر، برنامه‌های بیشتر و آمار کامل، پلن پیشرفته را فعال کنید.</p></div><button class="btn pri block big" data-a="goPro">دیدن پلن پیشرفته</button><button class="btn block" style="margin-top:8px" data-a="closeSheet">بعداً</button>');
+  }
   function addCoursesFromText(text, isTest) {
-    const names = String(text || '').split('\n').map((x) => x.trim().replace(/^[-*•–]\s*/, '')).filter(Boolean); const t = nowIso(); let n = 0;
+    const names = String(text || '').split('\n').map((x) => x.trim().replace(/^[-*•–]\s*/, '')).filter(Boolean); const t = nowIso(); let n = 0; lastBlocked = 0; let room = courseRoom();
     const maxO = Math.max(-1, ...S.courses.map((c) => (c.order == null ? -1 : c.order)));
-    names.forEach((name) => { if (S.courses.some((c) => !c.deletedAt && c.name === name)) return; S.courses.push({ id: uid(), name, type: isTest ? 'test' : 'chapter', color: COLORS[S.courses.length % COLORS.length], combos: S.combos.filter((x) => x.active).map((x) => x.id), coef: {}, archived: false, order: maxO + 1 + n, createdAt: t, updatedAt: t, deletedAt: null }); n++; });
+    names.forEach((name) => { if (S.courses.some((c) => !c.deletedAt && c.name === name)) return; if (room <= 0) { lastBlocked++; return; } room--; S.courses.push({ id: uid(), name, type: isTest ? 'test' : 'chapter', color: COLORS[S.courses.length % COLORS.length], combos: S.combos.filter((x) => x.active).map((x) => x.id), coef: {}, archived: false, order: maxO + 1 + n, createdAt: t, updatedAt: t, deletedAt: null }); n++; });
     return n;
   }
   function finishOnboarding() { S.settings.onboarded = true; ob = null; ROOT.prevActive = null; nav = { tab: 'today', stack: [] }; save(); render(); }
@@ -1070,7 +1083,7 @@
       return '<div class="card crs"><div class="row"><div class="grow"><div class="menu" style="box-shadow:none">' + programRow(pr) + '</div></div><button class="iconbtn ghosti" data-a="delProgram" data-id="' + pr.id + '" aria-label="حذف برنامه">×</button></div>' +
         (!isPro() && ROOT.programs.length > 1 ? '<div class="small" style="padding:0 12px 6px">' + (free ? chip('برنامه‌ی رایگان شما', 'ok') : '<button class="btn sm ghost" data-a="setFree" data-id="' + pr.id + '">این را برنامه‌ی رایگان کن</button>') + '</div>' : '') + '</div>'; }).join('') + '</div>';
     h += '<button class="btn pri block big" style="margin-top:14px" data-a="newProgram">برنامه‌ی جدید' + (isPro() || ROOT.programs.length < 1 ? '' : ' · پلن پیشرفته') + '</button>';
-    if (!isPro()) h += '<p class="small muted" style="margin-top:10px">در پلن رایگان یک برنامه با همه‌ی امکانات دارید. برای برنامه‌های بیشتر، پلن پیشرفته را فعال کنید.</p>';
+    if (!isPro()) h += '<p class="small muted" style="margin-top:10px">در پلن رایگان یک برنامه با حداکثر ' + fa(FREE_COURSES) + ' درس دارید. برای برنامه‌ها و درس‌های بیشتر و آمار کامل، پلن پیشرفته را فعال کنید.</p>';
     return h;
   }
   function vLocked() {
@@ -1120,7 +1133,7 @@
       (!pro ? '<button class="btn ' + (key === 'yearly' ? 'pri' : '') + ' block big" style="margin-top:10px" data-a="buy" data-v="' + PRODUCTS[key] + '" ' + (Billing.state === 'ready' ? '' : 'disabled') + '>' + (key === 'yearly' ? 'خرید اشتراک سالانه' : 'خرید اشتراک ماهانه') + '</button>' : '') + '</div>';
     let h = top('پلن پیشرفته');
     h += '<div class="prohero"><div class="row" style="gap:12px">' + LOGO + '<div><b style="font-size:19px">مسیر پیشرفته</b><div style="opacity:.9;font-size:13px">برای هر آزمون و هر گرایش، یک برنامه</div></div></div>' +
-      '<div class="pfeat">' + [['#FFD166', 'برنامه‌های نامحدود: هر آزمون و هر گرایش جدا'], ['#5CE1B0', 'جابه‌جایی سریع بین برنامه‌ها'], ['#FF9EB0', 'همه‌ی امکانات: برنامه‌ی هفتگی، زمان‌سنج، تست، مقایسه‌ی دورها، آمار'], ['#B9C6FF', 'داده‌های همه‌ی برنامه‌ها در یک فایل پشتیبان']].map(([c, t]) => '<div class="row" style="gap:10px;margin-top:8px"><span style="width:22px;height:22px;border-radius:7px;background:' + c + ';display:inline-flex;align-items:center;justify-content:center;color:#141B2D;font-size:14px;font-weight:700;flex:none">✓</span><span>' + t + '</span></div>').join('') + '</div></div>';
+      '<div class="pfeat">' + [['#FFD166', 'برنامه‌های نامحدود: هر آزمون و هر گرایش جدا'], ['#5CE1B0', 'درس‌های نامحدود در هر برنامه'], ['#FF9EB0', 'آمار کامل: نمودار ۱۴ روزه، مقایسه‌ی دروس، ضعیف‌ترین و قوی‌ترین فصل‌ها'], ['#B9C6FF', 'جابه‌جایی سریع بین برنامه‌ها و پشتیبان یکجا']].map(([c, t]) => '<div class="row" style="gap:10px;margin-top:8px"><span style="width:22px;height:22px;border-radius:7px;background:' + c + ';display:inline-flex;align-items:center;justify-content:center;color:#141B2D;font-size:14px;font-weight:700;flex:none">✓</span><span>' + t + '</span></div>').join('') + '</div></div>';
     if (pro) h += '<div class="banner ok" style="margin-top:14px">پلن پیشرفته‌ی شما فعال است (' + (ROOT.pro.sku === PRODUCTS.yearly ? 'سالانه' : 'ماهانه') + '). تمدید و لغو اشتراک از بخش «اشتراک‌ها» در اپ بازار انجام می‌شود.</div>';
     else {
       if (Billing.state === 'web') h += '<div class="banner info" style="margin-top:14px">خرید اشتراک فقط در اپ اندروید «مسیر» که از کافه بازار نصب شده امکان‌پذیر است.</div>';
@@ -1128,7 +1141,7 @@
       else if (Billing.state === 'error') h += '<div class="banner warn" style="margin-top:14px">' + esc(Billing.humanError(Billing.msg)) + ' <button class="btn sm" data-a="restorePro" style="margin-right:6px">تلاش دوباره</button></div>';
     }
     h += '<div class="list" style="margin-top:14px">' + card('yearly', 'سالانه', PRICE.yearly, 'معادل ماهی ' + fa(yearlyPerMonth) + ' تومان · پرداخت یک‌جا برای ۱۲ ماه', '۵۰٪ تخفیف') + card('monthly', 'ماهانه', PRICE.monthly, 'تمدید خودکار هر ماه؛ هر وقت خواستید لغو کنید') + '</div>';
-    h += '<div class="card" style="margin-top:12px"><b>پلن رایگان</b><div class="small muted">یک برنامه با همه‌ی امکانات، برای همیشه رایگان.</div></div>';
+    h += '<div class="card" style="margin-top:12px"><b>پلن رایگان</b><div class="small muted">یک برنامه با حداکثر ' + fa(FREE_COURSES) + ' درس، برنامه‌ی هفتگی، زمان‌سنج، ثبت تست، مقایسه‌ی دورهای هر فصل و آمار پایه؛ برای همیشه رایگان.</div></div>';
     if (Billing.state === 'ready' || Billing.state === 'error') h += '<button class="btn ghost block" style="margin-top:10px" data-a="restorePro">قبلاً خرید کرده‌ام؛ بازیابی اشتراک</button>';
     h += '<p class="small muted" style="margin-top:10px">پرداخت از طریق کافه بازار انجام می‌شود. اشتراک به حساب بازار شما متصل است و روی گوشی جدید هم با «بازیابی اشتراک» برمی‌گردد.</p>';
     return h;
@@ -1157,8 +1170,8 @@
     },
     obExam: (f) => { const v = f.examName.value.trim(); if (!v) { ob.err = 'نام آزمون را وارد کنید.'; return render(); } S.settings.examName = v; S.settings.track = f.track.value.trim(); ob.err = ''; ob.step++; render(); window.scrollTo(0, 0); },
     obAddCombo: (f) => { const t = f.t.value.trim(); if (!t) return; const code = /^[0-9۰-۹]+$/.test(t) ? L.toEnDigits(t) : ''; S.combos.push({ id: uid(), code, title: code ? '' : t, active: true }); render(); },
-    obAddCourses: (f) => { addCoursesFromText(f.names.value, f.test.checked); ob.err = ''; render(); },
-    coursesBatch: (f) => { const n = addCoursesFromText(f.names.value, f.test.checked); if (!n) return ($('#formerr', f).textContent = 'حداقل یک نام درس بنویسید.'); save(); closeSheet(); render(); toast(fa(n) + ' درس اضافه شد'); },
+    obAddCourses: (f) => { addCoursesFromText(f.names.value, f.test.checked); ob.err = lastBlocked ? fa(lastBlocked) + ' درس اضافه نشد: پلن رایگان تا ' + fa(FREE_COURSES) + ' درس دارد. بعداً با پلن پیشرفته می‌توانید اضافه کنید.' : ''; render(); },
+    coursesBatch: (f) => { const n = addCoursesFromText(f.names.value, f.test.checked); if (!n && lastBlocked) { closeSheet(true); return limitSheet(); } if (!n) return ($('#formerr', f).textContent = 'حداقل یک نام درس بنویسید.'); save(); closeSheet(); render(); if (lastBlocked) { toast(fa(n) + ' درس اضافه شد؛ ' + fa(lastBlocked) + ' درس به سقف پلن رایگان خورد'); } else toast(fa(n) + ' درس اضافه شد'); },
     obDate: (f) => { const d = L.parseIntSafe(f.jd.value), m = L.parseIntSafe(f.jm.value), y = L.parseIntSafe(f.jy.value); if (!L.isValidJalali(y, m, d)) { ob.err = 'تاریخ شمسی معتبر نیست.'; return render(); } const cap = readCapacity(f); if (!cap) { ob.err = 'ساعت مفید هر روز باید عددی بین ۰ تا ۱۸ باشد.'; return render(); } S.settings.examDate = L.jalaliToKey(y, m, d); S.settings.capacity = cap; ob.err = ''; ob.step++; render(); },
     obBook: (f) => { const v = formVals(f); if (!v.title.trim()) { ob.err = 'عنوان کتاب را وارد کنید.'; return render(); } const b = { id: uid(), courseId: v.courseId, title: v.title.trim(), author: '', createdAt: nowIso(), updatedAt: nowIso(), deletedAt: null }; S.books.push(b); addChapters(b.id, L.parseBatch(v.batch)); finishOnboarding(); },
     plan: (f) => {
@@ -1178,6 +1191,7 @@
       const combos = S.combos.filter((cb) => f['combo_' + cb.id].checked).map((cb) => cb.id); const coef = {};
       for (const cb of S.combos) { const n = L.parseNum(f['coef_' + cb.id].value); if (Number.isNaN(n) || (n != null && n < 0)) return (err.textContent = 'ضریب باید عدد نامنفی باشد.'); if (n != null && combos.includes(cb.id)) coef[cb.id] = n; }
       if (id) { const c = byId(S.courses, id); if (c.type !== v.type) audit('type', 'تغییر نوع «' + c.name + '»'); Object.assign(c, { name: v.name.trim(), type: v.type, color: v.color, combos, coef, archived: !!f.archived && f.archived.checked, updatedAt: nowIso() }); }
+      else if (courseRoom() <= 0) { closeSheet(true); return limitSheet(); }
       else S.courses.push({ id: uid(), name: v.name.trim(), type: v.type, color: v.color, combos, coef, archived: false, createdAt: nowIso(), updatedAt: nowIso(), deletedAt: null });
       save(); closeSheet(); render(); toast('ذخیره شد');
     },
