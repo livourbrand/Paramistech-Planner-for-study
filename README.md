@@ -1,10 +1,12 @@
-# اپلیکیشن درسی پارامیس تک — Paramis Tech Study
+# مسیر — Masir
+
+برنامه‌ریز مطالعه و کنکور، ساخت پارامیس تک.
 
 برنامه‌ریز مطالعه‌ی کنکور دکتری مدیریت برای اندروید: برنامه‌ی هفتگی، زمان‌سنج مطالعه و تست، ثبت تعداد تست و درصد صحیح هر فصل، و مقایسه‌ی هر فصل در دورهای مختلف. همه‌ی داده‌ها فقط روی گوشی ذخیره می‌شوند و از بخش «بیشتر ← پشتیبان» می‌توانید فایل JSON بگیرید.
 
 ## دریافت APK
 
-هر بار که روی شاخه‌ی `main` تغییری ثبت شود، GitHub Actions فایل APK را می‌سازد و در بخش **Releases** همین مخزن قرار می‌دهد. از گوشی وارد Releases شوید، فایل `ParamisTechStudy-….apk` را دانلود و نصب کنید (یک بار اجازه‌ی «نصب از منابع ناشناس» لازم است). برای ساخت دستی: **Actions ← Build APK ← Run workflow**.
+هر بار که روی شاخه‌ی `main` تغییری ثبت شود، GitHub Actions فایل APK را می‌سازد و در بخش **Releases** همین مخزن قرار می‌دهد. از گوشی وارد Releases شوید، فایل `Masir-….apk` را دانلود و نصب کنید (یک بار اجازه‌ی «نصب از منابع ناشناس» لازم است). برای ساخت دستی: **Actions ← Build APK ← Run workflow**.
 
 ## امضای برنامه
 
@@ -19,9 +21,15 @@
 
 - `web/` — کد اصلی اپ (`app.js`، `logic.js`، `style.css`)
 - `build-web.mjs` — ساخت `www/` با فونت وزیرمتن محلی و پل Capacitor
-- `android/` — پروژه‌ی اندروید (Capacitor 7)، شناسه‌ی بسته `tech.paramis.study`
+- `android/` — پروژه‌ی اندروید (Capacitor 7)، شناسه‌ی بسته `tech.paramis.masir`
 - `assets/` — آیکون و منابع گرافیکی
 
 ساخت محلی: `npm ci && node build-web.mjs && npx cap sync android`، سپس پوشه‌ی `android` را در Android Studio باز کنید.
 
 فونت وزیرمتن تحت مجوز SIL Open Font License (`www/fonts/OFL.txt`).
+
+## پرداخت درون‌برنامه‌ای کافه بازار
+
+- اشتراک‌ها: `masir_pro_monthly` (۲۰٬۰۰۰ تومان) و `masir_pro_yearly` (۱۲۰٬۰۰۰ تومان).
+- کلید RSA عمومی برنامه از پیشخان بازار (بخش پرداخت درون‌برنامه‌ای) در Secret مخزن با نام `BAZAAR_RSA_KEY` قرار می‌گیرد. بدون آن، صفحه‌ی پلن پیشرفته پیام «پرداخت هنوز فعال نشده» نشان می‌دهد.
+- پل بومی: `android/app/src/main/java/tech/paramis/masir/BazaarBillingPlugin.kt` (کتابخانه‌ی Poolakey 2.3.0).

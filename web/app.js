@@ -48,26 +48,23 @@
   const COLORS = ['#2F4EBF', '#3B5BA9', '#8A4FB0', '#B0533B', '#B08A1E', '#2E7D32', '#6B6B66', '#C2185B'];
 
   // ---------- state ----------
+  const MGMT_COMMON = [['زبان انگلیسی', 'test'], ['آمار و کاربرد در مدیریت', 'chapter'], ['مبانی سازمان و مدیریت', 'chapter'], ['مدیریت از دیدگاه اسلام', 'chapter']];
+  const TEMPLATES = [
+    { id: 'mgmt1', exam: 'کنکور دکتری مدیریت', track: 'ترکیب ۱ · بازرگانی و راهبردی', color: '#2F4EBF', extra: [['بازاریابی پیشرفته و مدیریت بازار', 'chapter']] },
+    { id: 'mgmt5', exam: 'کنکور دکتری مدیریت', track: 'ترکیب ۵ · فناوری اطلاعات', color: '#14B88A', extra: [['سیستم‌های اطلاعات مدیریت پیشرفته', 'chapter']] },
+    { id: 'mgmt6', exam: 'کنکور دکتری مدیریت', track: 'ترکیب ۶ · کارآفرینی', color: '#FF7A45', extra: [['نظریه‌های کارآفرینی و تئوری‌های نوآوری', 'chapter']] },
+  ];
   function defaultState() {
-    const t = nowIso();
-    const combos = [
-      { id: uid(), code: '1', title: 'مدیریت بازرگانی و راهبردی', active: true },
-      { id: uid(), code: '5', title: 'مدیریت فناوری اطلاعات', active: true },
-      { id: uid(), code: '6', title: 'کارآفرینی', active: true },
-    ];
-    const cid = (c) => combos.find((x) => x.code === c).id; const all = combos.map((c) => c.id);
-    const mk = (name, type, cs, i) => ({ id: uid(), name, type, color: COLORS[i % COLORS.length], combos: cs, coef: {}, archived: false, createdAt: t, updatedAt: t, deletedAt: null });
     return {
       app: 'konkur-dr-study', schema: SCHEMA, updatedAt: 0,
-      settings: { onboarded: false, examDate: '2027-01-31', testCount: 20, masteryPct: 90, reviewPct: 75, negOn: false, negRatio: 3, theme: 'auto', lastBackupAt: null, examName: 'کنکور دکتری مدیریت', groupLabel: 'ترکیب', preset: 'mgmt', introDone: false, seenTips: {}, checklistHidden: false, capacity: [360, 360, 360, 360, 360, 240, 360] },
-      combos,
-      courses: [
-        mk('زبان انگلیسی', 'test', all, 6), mk('آمار و کاربرد در مدیریت', 'chapter', all, 1), mk('مبانی سازمان و مدیریت', 'chapter', all, 0),
-        mk('مدیریت از دیدگاه اسلام', 'chapter', all, 4), mk('بازاریابی پیشرفته و مدیریت بازار', 'chapter', [cid('1')], 3),
-        mk('نظریه‌های کارآفرینی و تئوری‌های نوآوری', 'chapter', [cid('6')], 2), mk('سیستم‌های اطلاعات مدیریت پیشرفته', 'chapter', [cid('5')], 5),
-      ],
-      books: [], chapters: [], rounds: [], sessions: [], langLogs: [], plans: [], audit: [], timer: null,
+      settings: { onboarded: false, examDate: '2027-01-31', testCount: 20, masteryPct: 90, reviewPct: 75, negOn: false, negRatio: 3, theme: 'auto', lastBackupAt: null, examName: '', track: '', groupLabel: 'گرایش', preset: '', introDone: false, seenTips: {}, checklistHidden: false, capacity: [360, 360, 360, 360, 360, 240, 360] },
+      combos: [], courses: [], books: [], chapters: [], rounds: [], sessions: [], langLogs: [], plans: [], audit: [], timer: null,
     };
+  }
+  function applyTemplate(st, tpl) {
+    const t = nowIso(); const list = MGMT_COMMON.concat(tpl.extra);
+    st.settings.preset = tpl.id; st.settings.examName = tpl.exam; st.settings.track = tpl.track; st.combos = [];
+    st.courses = list.map(([name, type], i) => ({ id: uid(), name, type, color: COLORS[i % COLORS.length], combos: [], coef: {}, archived: false, order: i, createdAt: t, updatedAt: t, deletedAt: null }));
   }
   function migrate(o) {
     if (!o || o.app !== 'konkur-dr-study') throw new Error('فایل متعلق به این اپ نیست.');
@@ -86,10 +83,32 @@
     o.schema = SCHEMA;
     return o;
   }
-  let S; let localOk = true;
-  function loadLocal() { try { const raw = localStorage.getItem(KEY); if (raw) { S = migrate(JSON.parse(raw)); return; } } catch (e) { localOk = false; } S = defaultState(); }
-  function writeLocal() { try { localStorage.setItem(KEY, JSON.stringify(S)); localOk = true; } catch (e) { localOk = false; } }
-  function save() { S.updatedAt = Date.now(); writeLocal(); Cloud.schedule(); }
+  const ROOT_KEY = 'masir-v1';
+  let S; let ROOT; let localOk = true;
+  function newRoot() { return { app: 'masir', rschema: 1, updatedAt: 0, active: null, freeProgram: null, programs: [], data: {}, pro: null }; }
+  function programTitleFrom(st) { return (st.settings.examName || 'برنامه‌ی جدید') + (st.settings.track ? ' · ' + st.settings.track : ''); }
+  function migrateRoot(o) {
+    if (o && o.app === 'konkur-dr-study') { const st = migrate(o); const r = newRoot(); const id = uid(); r.programs.push({ id, title: programTitleFrom(st), createdAt: nowIso() }); r.data[id] = st; r.active = id; r.freeProgram = id; r.updatedAt = st.updatedAt || 0; return r; }
+    if (!o || o.app !== 'masir') throw new Error('فایل متعلق به این اپ نیست.');
+    if (!Array.isArray(o.programs)) o.programs = []; o.data = o.data || {};
+    o.programs = o.programs.filter((p) => o.data[p.id]); o.programs.forEach((p) => { o.data[p.id] = migrate(o.data[p.id]); });
+    if (!o.programs.length) { const id = uid(); o.programs.push({ id, title: 'برنامه‌ی جدید', createdAt: nowIso() }); o.data[id] = defaultState(); }
+    if (!o.data[o.active]) o.active = o.programs[0].id;
+    if (!o.freeProgram || !o.data[o.freeProgram]) o.freeProgram = o.programs[0].id;
+    return o;
+  }
+  function loadLocal() {
+    try {
+      const raw = localStorage.getItem(ROOT_KEY); if (raw) { ROOT = migrateRoot(JSON.parse(raw)); S = ROOT.data[ROOT.active]; return; }
+      const old = localStorage.getItem(KEY); if (old) { ROOT = migrateRoot(JSON.parse(old)); S = ROOT.data[ROOT.active]; writeLocal(); return; }
+    } catch (e) { localOk = false; }
+    ROOT = migrateRoot(newRoot()); S = ROOT.data[ROOT.active];
+  }
+  function writeLocal() { try { localStorage.setItem(ROOT_KEY, JSON.stringify(ROOT)); localOk = true; } catch (e) { localOk = false; } }
+  const curProgram = () => ROOT.programs.find((p) => p.id === ROOT.active);
+  function save() { S.updatedAt = Date.now(); ROOT.data[ROOT.active] = S; const pr = curProgram(); if (pr && S.settings.onboarded) pr.title = programTitleFrom(S); ROOT.updatedAt = S.updatedAt; writeLocal(); Cloud.schedule(); }
+  const isPro = () => !!(ROOT.pro && ROOT.pro.until > Date.now());
+  const programLocked = () => !isPro() && ROOT.active !== ROOT.freeProgram && ROOT.programs.length > 1;
   function audit(kind, detail) { S.audit.push({ id: uid(), at: nowIso(), kind, detail }); if (S.audit.length > 500) S.audit.splice(0, S.audit.length - 500); }
   function purgeBin() {
     const lim = Date.now() - BIN_DAYS * 86400000; let n = 0;
@@ -116,11 +135,11 @@
       const meta = await timeout(this.col().doc('state-meta').get(), 12000);
       if (meta.exists) {
         const m = meta.data();
-        if ((m.updatedAt || 0) > (S.updatedAt || 0)) {
+        if ((m.updatedAt || 0) > (ROOT.updatedAt || 0)) {
           const parts = [];
           for (let i = 0; i < m.n; i++) { const d = await this.col().doc('state-' + i).get(); if (!d.exists) throw new Error('chunk'); parts.push(d.data().s); this.last[i] = d.data().s; }
-          S = migrate(JSON.parse(parts.join(''))); ob = null; writeLocal(); render(); toast('داده‌ها از حساب شما بارگذاری شد');
-        } else if ((S.updatedAt || 0) > (m.updatedAt || 0)) this.schedule(0);
+          ROOT = migrateRoot(JSON.parse(parts.join(''))); S = ROOT.data[ROOT.active]; ob = null; writeLocal(); render(); toast('داده‌ها از حساب شما بارگذاری شد');
+        } else if ((ROOT.updatedAt || 0) > (m.updatedAt || 0)) this.schedule(0);
       } else if (S.settings.onboarded) this.schedule(0);
       this.status = 'on'; this.lastAt = Date.now();
     },
@@ -129,9 +148,9 @@
       if (this.busy) { this.t = setTimeout(() => this.push(), 1500); return; }
       this.busy = true; this.dirty = false;
       try {
-        const str = JSON.stringify(S); const n = Math.max(1, Math.ceil(str.length / CHUNK));
+        const str = JSON.stringify(ROOT); const n = Math.max(1, Math.ceil(str.length / CHUNK));
         for (let i = 0; i < n; i++) { const part = str.slice(i * CHUNK, (i + 1) * CHUNK); if (this.last[i] !== part) { await this.col().doc('state-' + i).set({ s: part }); this.last[i] = part; } }
-        await this.col().doc('state-meta').set({ n, updatedAt: S.updatedAt, schema: SCHEMA });
+        await this.col().doc('state-meta').set({ n, updatedAt: ROOT.updatedAt, schema: SCHEMA });
         this.status = 'on'; this.lastAt = Date.now(); this.err = '';
       } catch (e) { this.status = 'error'; this.err = (e && e.code) || ''; this.dirty = true; }
       this.busy = false; refreshSync();
@@ -269,9 +288,10 @@
   function render() {
     applyTheme();
     if (!S.settings.onboarded) { app().innerHTML = '<div class="wrap">' + vOnboard() + '</div>'; return; }
+    if (programLocked() && cur().s !== 'pro') { app().innerHTML = '<div class="wrap">' + vLocked() + '</div>'; return; }
     const c = cur(); let html = '';
     try {
-      const V = { today: vToday, plan: vPlan, courses: vCourses, course: vCourse, book: vBook, chapter: vChapter, session: vSession, stats: vStats, more: vMore, settings: vSettings, combos: vCombos, bin: vBin, backup: vBackup, audit: vAudit, selftest: vSelfTest, sessions: vSessions, help: vHelp, intro: () => vIntro(true) };
+      const V = { pro: vPro, programs: vPrograms, today: vToday, plan: vPlan, courses: vCourses, course: vCourse, book: vBook, chapter: vChapter, session: vSession, stats: vStats, more: vMore, settings: vSettings, combos: vCombos, bin: vBin, backup: vBackup, audit: vAudit, selftest: vSelfTest, sessions: vSessions, help: vHelp, intro: () => vIntro(true) };
       html = (V[c.s] || vToday)(c);
     } catch (e) { console.error(e); html = '<div class="banner bad">خطا در نمایش این صفحه. <button class="btn sm" data-a="home">بازگشت به امروز</button></div>'; }
     const tb = ([k, l, i]) => '<button data-a="tab" data-v="' + k + '" ' + (nav.tab === k ? 'aria-current="page"' : '') + '>' + i + '<span>' + l + '</span></button>';
@@ -289,31 +309,29 @@
   function vOnboard() {
     if (!S.settings.introDone) return vIntro(false);
     if (!ob) ob = { step: 0, err: '' };
-    const st = ob.step, N = 5; const custom = S.settings.preset === 'custom';
+    const st = ob.step, N = 4; const custom = S.settings.preset === 'custom';
+    const extra = ROOT.prevActive ? '<button class="btn ghost block" style="margin-top:6px" data-a="cancelNewProgram">انصراف از ساخت برنامه‌ی جدید</button>' : '';
     const head = '<div class="small muted" style="margin-top:8px">مرحله ' + faD(st + 1) + ' از ' + faD(N) + '</div><div class="bar" style="margin:6px 0 16px"><i style="width:' + ((st + 1) / N * 100) + '%"></i></div>';
     const nav2 = (nextLabel) => '<div class="row" style="margin-top:16px">' + (st > 0 ? '<button class="btn grow" data-a="obPrev">قبلی</button>' : '') + '<button class="btn pri grow big" data-a="obNext">' + (nextLabel || 'ادامه') + '</button></div>';
     const prev = '<div class="row" style="margin-top:12px"><button class="btn grow" data-a="obPrev">قبلی</button></div>';
     const err = ob.err ? '<div class="err" role="alert">' + esc(ob.err) + '</div>' : '';
     if (st === 0) {
-      const opt = (v, t, d) => '<button class="card tap choice' + (S.settings.preset === v ? ' on' : '') + '" data-a="obPreset" data-v="' + v + '" aria-pressed="' + (S.settings.preset === v) + '"><b>' + t + '</b><div class="small muted">' + d + '</div></button>';
-      return '<div style="margin-top:6px">' + BRAND + '</div>' + head + '<h1>برای چه آزمونی می‌خوانید؟</h1><p class="muted">اپ برای هر رشته و آزمونی کار می‌کند. بعداً از تنظیمات هم قابل تغییر است.</p><div class="list">' +
-        opt('mgmt', 'کنکور دکتری مدیریت', 'دروس و ترکیب‌های ۱، ۵ و ۶ آماده‌اند؛ فقط تأیید یا ویرایش می‌کنید.') + opt('custom', 'رشته یا آزمون دیگر', 'ارشد، دکتری، کنکور سراسری، استخدامی یا هر آزمون دیگر؛ دروس را خودتان وارد می‌کنید.') + '</div>' +
-        (custom ? '<form data-form="obExam" class="card" style="margin-top:12px">' + txt('examName', 'نام آزمون یا رشته', S.settings.examName, 'placeholder="مثلاً کنکور ارشد روانشناسی"') + err + '<button class="btn pri block big" style="margin-top:14px">ادامه</button></form>' : nav2());
+      const opt = (v, t, d, color) => '<button class="card tap choice' + (S.settings.preset === v ? ' on' : '') + '" data-a="obPreset" data-v="' + v + '" aria-pressed="' + (S.settings.preset === v) + '"><div class="row"><span class="cdot" style="width:14px;height:14px;background:' + color + '"></span><b class="grow">' + t + '</b>' + (S.settings.preset === v ? chip('انتخاب شد', 'acc') : '') + '</div><div class="small muted" style="margin-top:4px">' + d + '</div></button>';
+      return '<div style="margin-top:6px">' + BRAND + '</div>' + head + '<h1>' + (ROOT.prevActive ? 'برنامه‌ی جدید' : 'برای چه آزمونی می‌خوانید؟') + '</h1><p class="muted">هر آزمون و هر گرایش یک «برنامه»‌ی جداست. یکی را انتخاب کنید؛ دروسش آماده می‌شود و بعداً قابل ویرایش است.</p>' +
+        '<div class="small muted" style="margin:12px 0 6px;font-weight:700">کنکور دکتری مدیریت</div><div class="list">' +
+        TEMPLATES.map((t) => opt(t.id, t.track, MGMT_COMMON.map((x) => x[0]).slice(1).join('، ') + '، زبان و ' + t.extra[0][0], t.color)).join('') + '</div>' +
+        '<div class="small muted" style="margin:16px 0 6px;font-weight:700">آزمون دیگر</div>' + opt('custom', 'رشته یا آزمون دیگر', 'ارشد، دکتری، سراسری، استخدامی…؛ دروس را خودتان وارد می‌کنید.', '#7B4DFF') +
+        (custom ? '<form data-form="obExam" class="card" style="margin-top:12px">' + txt('examName', 'نام آزمون یا رشته', S.settings.examName, 'placeholder="مثلاً کنکور ارشد روانشناسی"') + txt('track', 'گرایش (اختیاری)', S.settings.track, 'placeholder="مثلاً بالینی"') + err + '<button class="btn pri block big" style="margin-top:14px">ادامه</button></form>' : err + nav2()) + extra;
     }
     if (st === 1) {
-      return head + '<h1>' + (custom ? 'گرایش‌ها (اختیاری)' : 'ترکیب‌های هدف') + '</h1><p class="muted">' + (custom ? 'اگر آزمون شما گرایش یا ترکیب‌های مختلف با دروس متفاوت دارد اینجا اضافه کنید؛ وگرنه این مرحله را رد کنید.' : 'آزمون دکتری مدیریت (کد ۲۱۶۲). فقط دروس ترکیب‌های فعال در برنامه می‌آیند.') + '</p>' +
-        (S.combos.length ? '<div class="card">' + S.combos.map((c) => '<div class="row"><label class="check grow"><input type="checkbox" data-a="obCombo" data-id="' + c.id + '" ' + (c.active ? 'checked' : '') + '><span>' + esc(comboLabel(c)) + (c.code && c.title ? ' — ' + esc(c.title) : '') + '</span></label><button class="iconbtn ghosti" data-a="obDelCombo" data-id="' + c.id + '" aria-label="حذف">×</button></div>').join('') + '</div>' : '') +
-        '<form data-form="obAddCombo" class="row" style="margin-top:10px"><input name="t" type="text" placeholder="' + (custom ? 'نام گرایش، مثلاً بالینی' : 'شماره یا نام ترکیب جدید') + '" class="grow"><button class="btn">افزودن</button></form>' + nav2(custom && !S.combos.length ? 'رد کردن' : null);
-    }
-    if (st === 2) {
       const cs = S.courses.filter((c) => !c.deletedAt);
       return head + '<h1>دروس</h1><p class="muted">' + (cs.length ? 'درسی را که نمی‌خواهید بردارید یا نوعش را عوض کنید.' : 'دروس آزمون را وارد کنید: هر خط یک درس.') + '</p>' +
-        (cs.length ? '<div class="card">' + cs.map((c) => '<div class="row" style="border-bottom:1px solid var(--line)"><label class="check grow"><input type="checkbox" data-a="obCourse" data-id="' + c.id + '" ' + (!c.archived ? 'checked' : '') + '><span><b>' + esc(c.name) + '</b>' + (comboNames(c) ? '<br><span class="small muted">' + comboNames(c) + '</span>' : '') + '</span></label><button class="chip ' + (c.type === 'test' ? 'acc' : '') + '" style="border:0;min-height:36px;cursor:pointer" data-a="obType" data-id="' + c.id + '">' + (c.type === 'test' ? 'فقط تست' : 'فصل‌به‌فصل') + '</button></div>').join('') + '</div><p class="small muted" style="margin-top:6px">«فصل‌به‌فصل»: مطالعه و تست هر فصل. «فقط تست»: درس بدون فصل مثل زبان. با لمس برچسب عوض می‌شود.</p>' : '') +
+        (cs.length ? '<div class="card">' + cs.map((c) => '<div class="row" style="border-bottom:1px solid var(--line)"><label class="check grow"><input type="checkbox" data-a="obCourse" data-id="' + c.id + '" ' + (!c.archived ? 'checked' : '') + '><span><b>' + esc(c.name) + '</b></span></label><button class="chip ' + (c.type === 'test' ? 'acc' : '') + '" style="border:0;min-height:36px;cursor:pointer" data-a="obType" data-id="' + c.id + '">' + (c.type === 'test' ? 'فقط تست' : 'فصل‌به‌فصل') + '</button></div>').join('') + '</div><p class="small muted" style="margin-top:6px">«فصل‌به‌فصل»: مطالعه و تست هر فصل. «فقط تست»: درس بدون فصل مثل زبان. با لمس برچسب عوض می‌شود.</p>' : '') +
         '<form data-form="obAddCourses" class="card" style="margin-top:10px">' + area('names', cs.length ? 'افزودن درس (هر خط یک درس)' : 'نام دروس (هر خط یک درس)', '', 'ادبیات\nزبان انگلیسی\nآمار') + '<label class="check"><input type="checkbox" name="test"><span>این دروس «فقط تست» هستند</span></label><button class="btn block" style="margin-top:8px">افزودن</button></form>' + err + nav2();
     }
-    if (st === 3) { const j = L.keyToJalali(S.settings.examDate);
+    if (st === 2) { const j = L.keyToJalali(S.settings.examDate);
       return head + '<h1>تاریخ آزمون و ساعت مفید</h1><form data-form="obDate"><div class="card"><h3>تاریخ آزمون</h3><div class="grid4" style="grid-template-columns:1fr 1fr 1.4fr">' + num('jd', 'روز', j.jd) + num('jm', 'ماه', j.jm) + num('jy', 'سال', j.jy) + '</div></div>' +
-        '<div class="card" style="margin-top:12px"><h3>ساعت مفید مطالعه در هر روز هفته</h3><p class="small muted">برنامه‌ی هر روز با این ظرفیت سنجیده می‌شود.</p>' + capacityInputs(S.settings.capacity) + '</div>' +
+        '<div class="card" style="margin-top:12px"><h3>چند ساعت در روز می‌توانید درس بخوانید؟</h3><p class="small muted">برنامه‌ی هر روز با این عدد سنجیده می‌شود.</p>' + capacityInputs(S.settings.capacity) + '</div>' +
         err + '<button class="btn pri block big" style="margin-top:16px">ادامه</button></form>' + prev; }
     const cs = S.courses.filter((c) => !c.deletedAt && !c.archived && c.type !== 'test');
     if (!cs.length) return head + '<h1>آماده‌اید</h1><p class="muted">درس فصل‌به‌فصلی ندارید؛ هر وقت خواستید از بخش «درس‌ها» اضافه کنید.</p><button class="btn pri block big" data-a="obFinish">شروع</button>' + prev;
@@ -322,28 +340,31 @@
       txt('title', 'عنوان کتاب یا جزوه', '') + area('batch', 'فصل‌ها', '', 'فصل ۱: مفاهیم پایه\nفصل ۲\nفصل ۳') +
       err + '<button class="btn pri block big" style="margin-top:16px">ثبت و شروع</button></form><button class="btn ghost block" style="margin-top:8px" data-a="obFinish">فعلاً بدون کتاب شروع کن</button>' + prev;
   }
-  const BRAND = '<div class="row" style="gap:10px"><span class="logo"><svg viewBox="0 0 120 120" width="30" height="30"><circle cx="60" cy="60" r="38" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="9"/><path d="M60 22 A38 38 0 1 1 22 60" fill="none" stroke="#FFD166" stroke-width="9" stroke-linecap="round"/><path d="M50 80 V40 H64 A12 12 0 0 1 64 64 H50" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>اپلیکیشن درسی پارامیس تک</b></div>';
+  const LOGO = '<svg viewBox="0 0 120 120" width="42" height="42" aria-hidden="true"><rect width="120" height="120" rx="30" fill="#14B88A"/><path d="M28 98 C 28 66, 86 78, 76 52 S 38 36, 66 18" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-dasharray="1 15"/><circle cx="28" cy="98" r="7" fill="#FFD166"/><path d="M86 10 a13 13 0 0 1 13 13 c0 10 -13 22 -13 22 s-13 -12 -13 -22 a13 13 0 0 1 13 -13 z" fill="#FF5A7A"/><circle cx="86" cy="23" r="5" fill="#fff"/></svg>';
+  const BRAND = '<div class="row" style="gap:10px">' + LOGO + '<div><b style="font-size:17px">مسیر</b><div class="small muted">برنامه‌ریز مطالعه و کنکور</div></div></div>';
 
   // ---------- guidance: intro, tips, checklist, help ----------
   const ART = {
-    welcome: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true"><rect x="80" y="10" width="80" height="80" rx="20" fill="#2F4EBF"/><circle cx="120" cy="50" r="25" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="6"/><path d="M120 25 A25 25 0 1 1 95 50" fill="none" stroke="#FFD166" stroke-width="6" stroke-linecap="round"/><path d="M114 63 V38 H123 A8 8 0 0 1 123 54 H114" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><rect x="40" y="108" width="44" height="10" rx="5" fill="var(--acc-soft)"/><rect x="98" y="108" width="44" height="10" rx="5" fill="var(--acc)"/><rect x="156" y="108" width="44" height="10" rx="5" fill="var(--acc-soft)"/></svg>',
-    plan: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true">' + [0, 1, 2, 3, 4, 5, 6].map((i) => { const h = [60, 80, 45, 90, 70, 30, 75][i]; return '<rect x="' + (22 + i * 30) + '" y="' + (120 - h) + '" width="20" height="' + h + '" rx="5" fill="' + (i === 3 ? 'var(--bad)' : 'var(--acc)') + '" opacity="' + (i === 3 ? 1 : 0.85) + '"/>'; }).join('') + '<line x1="14" x2="226" y1="40" y2="40" stroke="var(--ink)" stroke-width="2" stroke-dasharray="5 4"/><text x="226" y="32" font-size="11" text-anchor="end" fill="var(--muted)">ظرفیت روز</text></svg>',
-    round: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true"><circle cx="45" cy="60" r="28" fill="var(--acc-soft)" stroke="var(--acc)" stroke-width="3"/><path d="M45 44 V60 L56 67" fill="none" stroke="var(--acc)" stroke-width="3" stroke-linecap="round"/><text x="45" y="112" font-size="12" text-anchor="middle" fill="var(--ink)">مطالعه</text><path d="M80 60 H100" stroke="var(--muted)" stroke-width="2"/><path d="M96 55 L102 60 L96 65" fill="none" stroke="var(--muted)" stroke-width="2"/><rect x="104" y="34" width="34" height="52" rx="6" fill="var(--card)" stroke="var(--acc)" stroke-width="3"/><path d="M111 48 H131 M111 60 H131 M111 72 H124" stroke="var(--acc)" stroke-width="3" stroke-linecap="round"/><text x="121" y="112" font-size="12" text-anchor="middle" fill="var(--ink)">تست</text><path d="M144 60 H164" stroke="var(--muted)" stroke-width="2"/><path d="M160 55 L166 60 L160 65" fill="none" stroke="var(--muted)" stroke-width="2"/><circle cx="196" cy="60" r="28" fill="var(--ok-soft)" stroke="var(--ok)" stroke-width="3"/><text x="196" y="66" font-size="16" font-weight="700" text-anchor="middle" fill="var(--ok)">۸۵٪</text><text x="196" y="112" font-size="12" text-anchor="middle" fill="var(--ink)">نتیجه</text></svg>',
-    compare: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true"><line x1="20" x2="220" y1="116" y2="116" stroke="var(--line)"/>' + [[50, 70, 60], [120, 52, 78], [190, 36, 90]].map(([x, h, p]) => '<rect x="' + (x - 16) + '" y="' + (116 - h) + '" width="32" height="' + h + '" rx="5" fill="var(--soft)" stroke="var(--line)"/>').join('') + '<path d="M50 70 L120 44 L190 26" fill="none" stroke="var(--acc)" stroke-width="3"/>' + [[50, 70, '۶۰٪'], [120, 44, '۷۸٪'], [190, 26, '۹۰٪']].map(([x, y, t]) => '<circle cx="' + x + '" cy="' + y + '" r="5" fill="var(--acc)"/><text x="' + x + '" y="' + (y - 10) + '" font-size="12" font-weight="700" text-anchor="middle" fill="var(--acc)">' + t + '</text>').join('') + '<text x="50" y="134" font-size="11" text-anchor="middle" fill="var(--muted)">دور ۱</text><text x="120" y="134" font-size="11" text-anchor="middle" fill="var(--muted)">دور ۲</text><text x="190" y="134" font-size="11" text-anchor="middle" fill="var(--muted)">دور ۳</text></svg>',
-    safe: '<svg viewBox="0 0 240 140" role="img" aria-hidden="true"><rect x="88" y="14" width="64" height="112" rx="12" fill="var(--card)" stroke="var(--ink)" stroke-width="3"/><rect x="100" y="34" width="40" height="8" rx="4" fill="var(--acc)"/><rect x="100" y="50" width="30" height="8" rx="4" fill="var(--acc-soft)"/><rect x="100" y="66" width="36" height="8" rx="4" fill="var(--acc-soft)"/><path d="M168 64 h30 v34 h-30 z" fill="var(--acc-soft)" stroke="var(--acc)" stroke-width="3"/><path d="M174 64 v-10 a9 9 0 0 1 18 0 v10" fill="none" stroke="var(--acc)" stroke-width="3"/><text x="183" y="118" font-size="11" text-anchor="middle" fill="var(--muted)">پشتیبان</text></svg>',
+    welcome: '<svg viewBox="0 0 260 170" role="img" aria-hidden="true"><circle cx="60" cy="50" r="34" fill="#FFE7A3"/><circle cx="210" cy="120" r="40" fill="#D7F5EA"/><circle cx="215" cy="35" r="18" fill="#FFD5DD"/><g transform="translate(85 25)"><rect width="90" height="90" rx="24" fill="#14B88A"/><path d="M20 74 C 20 50, 66 58, 58 38 S 30 26, 50 12" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-dasharray="1 12"/><circle cx="20" cy="74" r="6" fill="#FFD166"/><path d="M66 6 a10 10 0 0 1 10 10 c0 8 -10 17 -10 17 s-10 -9 -10 -17 a10 10 0 0 1 10 -10 z" fill="#FF5A7A"/><circle cx="66" cy="16" r="4" fill="#fff"/></g><rect x="50" y="138" width="44" height="12" rx="6" fill="#FF8A3D"/><rect x="108" y="138" width="44" height="12" rx="6" fill="#2F4EBF"/><rect x="166" y="138" width="44" height="12" rx="6" fill="#7B4DFF"/></svg>',
+    programs: '<svg viewBox="0 0 260 170" role="img" aria-hidden="true"><circle cx="130" cy="85" r="78" fill="#EEF2FB"/>' + [[30, '#2F4EBF', 'ترکیب ۱'], [100, '#14B88A', 'ترکیب ۵'], [170, '#FF8A3D', 'ترکیب ۶']].map(([x, c, t], i) => '<g transform="translate(' + x + ' ' + (40 + (i === 1 ? -10 : 0)) + ')"><rect width="62" height="84" rx="14" fill="' + c + '"/><rect x="10" y="14" width="42" height="7" rx="3.5" fill="#fff" opacity=".9"/><rect x="10" y="28" width="30" height="7" rx="3.5" fill="#fff" opacity=".6"/><rect x="10" y="42" width="36" height="7" rx="3.5" fill="#fff" opacity=".6"/><text x="31" y="72" font-size="11" font-weight="700" text-anchor="middle" fill="#fff">' + t + '</text></g>').join('') + '</svg>',
+    plan: '<svg viewBox="0 0 260 170" role="img" aria-hidden="true"><rect x="10" y="10" width="240" height="150" rx="22" fill="#FFF4DA"/>' + [0, 1, 2, 3, 4, 5, 6].map((i) => { const h = [60, 80, 45, 104, 70, 34, 75][i]; const c = ['#2F4EBF', '#14B88A', '#7B4DFF', '#FF5A7A', '#FF8A3D', '#2F4EBF', '#14B88A'][i]; return '<rect x="' + (28 + i * 31) + '" y="' + (140 - h) + '" width="22" height="' + h + '" rx="7" fill="' + c + '"/>'; }).join('') + '<line x1="20" x2="240" y1="46" y2="46" stroke="#141B2D" stroke-width="2.5" stroke-dasharray="6 5"/><circle cx="133" cy="30" r="11" fill="#FF5A7A"/><text x="133" y="35" font-size="13" font-weight="700" text-anchor="middle" fill="#fff">!</text></svg>',
+    round: '<svg viewBox="0 0 260 170" role="img" aria-hidden="true"><circle cx="48" cy="72" r="36" fill="#E3E9FB"/><circle cx="48" cy="72" r="26" fill="#2F4EBF"/><path d="M42 60 v24 l20 -12 z" fill="#fff"/><text x="48" y="132" font-size="13" font-weight="700" text-anchor="middle" fill="#2F4EBF">بخوان</text><path d="M92 72 h22" stroke="#B7C1DB" stroke-width="3" stroke-linecap="round"/><rect x="120" y="38" width="46" height="66" rx="10" fill="#FFF0D0" stroke="#FF8A3D" stroke-width="3"/><circle cx="133" cy="56" r="4" fill="#FF8A3D"/><rect x="141" y="53" width="17" height="6" rx="3" fill="#FF8A3D"/><circle cx="133" cy="72" r="4" fill="#14B88A"/><rect x="141" y="69" width="17" height="6" rx="3" fill="#14B88A"/><circle cx="133" cy="88" r="4" fill="#FF5A7A"/><rect x="141" y="85" width="12" height="6" rx="3" fill="#FF5A7A"/><text x="143" y="132" font-size="13" font-weight="700" text-anchor="middle" fill="#FF8A3D">تست بزن</text><path d="M172 72 h22" stroke="#B7C1DB" stroke-width="3" stroke-linecap="round"/><circle cx="222" cy="72" r="32" fill="#D7F5EA"/><text x="222" y="79" font-size="19" font-weight="700" text-anchor="middle" fill="#0F8F6B">۸۵٪</text><text x="222" y="132" font-size="13" font-weight="700" text-anchor="middle" fill="#0F8F6B">نتیجه</text></svg>',
+    compare: '<svg viewBox="0 0 260 170" role="img" aria-hidden="true"><rect x="10" y="10" width="240" height="150" rx="22" fill="#F1ECFF"/>' + [[60, 70, '#FFB199'], [130, 54, '#FFD166'], [200, 40, '#5CE1B0']].map(([x, h, c]) => '<rect x="' + (x - 20) + '" y="' + (138 - h) + '" width="40" height="' + h + '" rx="9" fill="' + c + '"/>').join('') + '<path d="M60 78 L130 52 L200 30" fill="none" stroke="#7B4DFF" stroke-width="4" stroke-linecap="round"/>' + [[60, 78, '۶۰٪'], [130, 52, '۷۸٪'], [200, 30, '۹۰٪']].map(([x, y, t]) => '<circle cx="' + x + '" cy="' + y + '" r="7" fill="#7B4DFF"/><text x="' + x + '" y="' + (y - 13) + '" font-size="13" font-weight="700" text-anchor="middle" fill="#7B4DFF">' + t + '</text>').join('') + '<text x="60" y="155" font-size="11" text-anchor="middle" fill="#5A6785">دور ۱</text><text x="130" y="155" font-size="11" text-anchor="middle" fill="#5A6785">دور ۲</text><text x="200" y="155" font-size="11" text-anchor="middle" fill="#5A6785">دور ۳</text></svg>',
+    safe: '<svg viewBox="0 0 260 170" role="img" aria-hidden="true"><circle cx="130" cy="88" r="74" fill="#D7F5EA"/><rect x="96" y="22" width="68" height="124" rx="16" fill="#fff" stroke="#141B2D" stroke-width="3"/><rect x="108" y="44" width="44" height="10" rx="5" fill="#2F4EBF"/><rect x="108" y="62" width="32" height="10" rx="5" fill="#FFD166"/><rect x="108" y="80" width="38" height="10" rx="5" fill="#FF5A7A"/><g transform="translate(170 78)"><rect width="44" height="38" rx="9" fill="#14B88A"/><path d="M10 0 v-10 a12 12 0 0 1 24 0 v10" fill="none" stroke="#14B88A" stroke-width="5"/><circle cx="22" cy="18" r="5" fill="#fff"/></g></svg>',
   };
   const INTRO = [
-    ['welcome', 'به پارامیس تک خوش آمدید', 'برنامه‌ریز مطالعه برای هر رشته و آزمونی. سه کار اصلی دارد: برنامه بریزید، زمان و تست هر فصل را بسنجید، و ببینید هر فصل در هر دور چقدر بهتر شده.'],
-    ['plan', 'هر هفته برنامه بریزید', 'در تب «برنامه» برای هر روز فصل‌ها را با زمان هدف و تعداد تست هدف بچینید. اگر برنامه‌ی روزی از ساعت مفید آن روز بیشتر شود، نوارش قرمز می‌شود.'],
-    ['round', 'هر دور: مطالعه، تست، نتیجه', 'روی فصل «شروع دور» را بزنید: زمان‌سنج مطالعه، بعد زمان‌سنج تست، بعد تعداد صحیح یا درصد. بدون زمان‌سنج خواندید؟ «ثبت سریع» را بزنید.'],
-    ['compare', 'دورها را مقایسه کنید', 'هر بار که سراغ یک فصل برمی‌گردید یک دور تازه است. درصد و زمان همه‌ی دورها کنار هم نمایش داده می‌شود. زمان کمتر فقط وقتی پیشرفت است که درصد افت نکرده باشد.'],
-    ['safe', 'داده‌ها روی دستگاه شما', 'همه چیز روی همین دستگاه ذخیره می‌شود. هر هفته از «بیشتر ← پشتیبان» یک فایل پشتیبان بگیرید تا با عوض شدن گوشی چیزی از دست نرود.'],
+    ['welcome', 'به «مسیر» خوش آمدید', 'مسیر کمکتان می‌کند درس خواندن را برنامه‌ریزی کنید، زمانش را بسنجید و ببینید هر فصل چقدر بهتر شده است.'],
+    ['programs', 'هر آزمون، یک برنامه', 'برای آزمون و گرایش خودتان یک برنامه بسازید؛ مثلاً «دکتری مدیریت، ترکیب ۱». دروسش آماده می‌شود.'],
+    ['plan', 'برنامه‌ی هفته را بچینید', 'برای هر روز بنویسید کدام فصل را چند دقیقه می‌خوانید. اگر از وقت آزادتان بیشتر شد، رنگش قرمز می‌شود.'],
+    ['round', 'بخوانید، تست بزنید، نتیجه ببینید', 'دکمه‌ی ▶ را بزنید و بخوانید. اگر فصل تمام نشد، بعداً ادامه دهید. آخر کار تست بزنید و تعداد درست‌ها را بنویسید.'],
+    ['compare', 'پیشرفتتان را ببینید', 'هر بار که فصلی را دوباره می‌خوانید، نتیجه کنار دفعه‌های قبل می‌آید. درصد بالاتر یا زمان کمتر با همان درصد یعنی پیشرفت.'],
+    ['safe', 'اطلاعات روی گوشی خودتان', 'همه‌چیز روی همین گوشی ذخیره می‌شود. هفته‌ای یک بار از «بیشتر ← پشتیبان» یک فایل پشتیبان بگیرید.'],
   ];
   let introIdx = 0;
   function vIntro(fromHelp) {
     const [art, t, b] = INTRO[introIdx]; const last = introIdx === INTRO.length - 1;
     return (fromHelp ? top('معرفی اپ') : '<div class="row between" style="margin-top:4px"><span class="small muted">' + faD(introIdx + 1) + ' از ' + faD(INTRO.length) + '</span><button class="btn ghost sm" data-a="introSkip">رد کردن</button></div>') +
-      '<div style="text-align:center;padding:12px 0 4px"><div style="max-width:300px;margin:0 auto">' + ART[art] + '</div><h1 style="margin-top:18px">' + t + '</h1><p class="muted" style="max-width:420px;margin:8px auto 0">' + b + '</p></div>' +
+      '<div style="text-align:center;padding:12px 0 4px"><div class="introart">' + ART[art] + '</div><h1 style="margin-top:18px">' + t + '</h1><p class="muted" style="max-width:420px;margin:8px auto 0">' + b + '</p></div>' +
       '<div class="row" style="justify-content:center;gap:6px;margin:20px 0" aria-hidden="true">' + INTRO.map((_, i) => '<span style="width:' + (i === introIdx ? 22 : 8) + 'px;height:8px;border-radius:8px;background:' + (i === introIdx ? 'var(--acc)' : 'var(--line)') + '"></span>').join('') + '</div>' +
       '<div class="row">' + (introIdx > 0 ? '<button class="btn grow" data-a="introPrev">قبلی</button>' : '') + '<button class="btn pri big grow" data-a="introNext">' + (last ? (fromHelp ? 'پایان' : 'شروع تنظیمات') : 'بعدی') + '</button></div>';
   }
@@ -378,13 +399,15 @@
       ['اولین فایل پشتیبان را بگیرید', !!S.settings.lastBackupAt, 'goMore', 'backup', 'پشتیبان'],
     ];
     const done = items.filter((x) => x[1]).length; if (done === items.length) return '';
-    return '<div class="card" style="margin-top:14px"><div class="row between"><b>شروع کار با پارامیس تک</b><button class="btn ghost sm" data-a="hideChecklist">بستن</button></div><div class="small muted">' + fa(done) + ' از ' + fa(items.length) + ' انجام شد</div><div style="margin:8px 0 4px">' + bar(done, items.length) + '</div>' +
+    return '<div class="card" style="margin-top:14px"><div class="row between"><b>شروع کار با مسیر</b><button class="btn ghost sm" data-a="hideChecklist">بستن</button></div><div class="small muted">' + fa(done) + ' از ' + fa(items.length) + ' انجام شد</div><div style="margin:8px 0 4px">' + bar(done, items.length) + '</div>' +
       items.map(([t, ok, a, v, l]) => '<div class="row" style="min-height:44px;border-top:1px solid var(--line)"><span class="chip ' + (ok ? 'ok' : '') + '" style="width:26px;height:26px;padding:0;justify-content:center" aria-label="' + (ok ? 'انجام شده' : 'انجام نشده') + '">' + (ok ? '✓' : faD(items.findIndex((x) => x[0] === t) + 1)) + '</span><span class="grow small" style="' + (ok ? 'text-decoration:line-through;color:var(--muted)' : '') + '">' + t + '</span>' + (!ok && a ? '<button class="btn sm" data-a="' + a + '" data-v="' + v + '">' + l + '</button>' : '') + '</div>').join('') + '</div>';
   }
   function vHelp() {
     const s = S.settings; const n = s.testCount; const m = Math.ceil(n * s.masteryPct / 100), r = Math.ceil(n * s.reviewPct / 100);
     const Q = [
       ['شروع سریع', '۱) در «درس‌ها» برای هر درس کتاب بسازید و فهرست فصل‌ها را بچسبانید. ۲) در «برنامه» برای روزها فصل و زمان هدف بگذارید. ۳) در «امروز» روی «شروع دور» بزنید. ۴) بعد از چند دور، در صفحه‌ی هر فصل پیشرفت را ببینید.'],
+      ['برنامه چیست؟', 'هر آزمون و هر گرایش یک «برنامه»‌ی جداست؛ مثلاً «دکتری مدیریت · ترکیب ۵». دروس، فصل‌ها، برنامه‌ی هفتگی و نتیجه‌های هر برنامه جدا نگه داشته می‌شود. از بالای صفحه‌ی «امروز» بین برنامه‌ها جابه‌جا شوید.'],
+      ['پلن رایگان و پیشرفته', 'پلن رایگان: یک برنامه با همه‌ی امکانات. پلن پیشرفته: برنامه‌های نامحدود؛ ماهانه ' + fa(PRICE.monthly) + ' تومان یا سالانه ' + fa(PRICE.yearly) + ' تومان (۵۰٪ تخفیف). پرداخت و لغو اشتراک از طریق کافه بازار است.'],
       ['دور چیست؟', 'هر بار که یک فصل را از اول تا آخر می‌خوانید و تست می‌زنید یک «دور» است. دور ۱ اولین مطالعه است و دورهای بعدی مرور. داده‌ی هر دور جدا ذخیره می‌شود و دورهای قبلی هرگز تغییر نمی‌کنند.'],
       ['چرخه‌ی داخل دور', 'اگر نتیجه‌ی تست راضی‌کننده نبود، «مطالعه‌ی مجدد و تست جدید» در همان دور یک چرخه‌ی دیگر می‌سازد. در مقایسه‌ی دورها، درصد آخرین تست هر دور ملاک است.'],
       ['زمان‌سنج', 'زمان‌سنج بر اساس ساعت شروع کار می‌کند، پس با بستن اپ یا قفل شدن صفحه دقیق می‌ماند. هم‌زمان فقط یک زمان‌سنج فعال است. «مکث» و «ویرایش دستی» برای وقفه‌ها و اصلاح زمان است.'],
@@ -405,7 +428,7 @@
     const tk = todayKey(); const days = L.daysBetween(tk, S.settings.examDate);
     const act = dayActual(tk); const cap = capacityOf(tk); const plans = dayPlans(tk);
     const planned = plans.reduce((a, p) => a + (p.minutes || 0), 0);
-    let h = '<div class="row" style="margin-top:2px;align-items:flex-start"><div class="grow"><div class="small muted">' + fmtJ(tk, true) + ' ' + faD(L.keyToJalali(tk).jy) + '</div><h1 style="margin:0">امروز</h1><div class="small muted">' + esc(S.settings.examName) + '</div></div>' +
+    let h = '<div class="row" style="margin-top:2px;align-items:flex-start"><div class="grow"><div class="small muted">' + fmtJ(tk, true) + ' ' + faD(L.keyToJalali(tk).jy) + '</div><h1 style="margin:0">امروز</h1><button class="progchip" data-a="programsSheet">' + esc(curProgram().title) + ' ▾</button></div>' +
       '<div style="text-align:center"><div class="count">' + (days >= 0 ? fa(days) : '—') + '</div><div class="small muted">' + (days > 0 ? 'روز تا آزمون' : days === 0 ? 'روز آزمون' : 'تاریخ آزمون گذشته') + '</div></div>' + gearBtn() + '</div>';
     h += checklist();
     if (S.timer) h += '<div style="margin-top:14px">' + runningCard() + '</div>';
@@ -724,20 +747,20 @@
 
   // ---------- MORE ----------
   function vMore() {
-    const items = [['help', 'راهنما', 'آموزش بخش‌ها، معرفی اپ و چک‌لیست شروع'], ['settings', 'تنظیمات', 'تاریخ آزمون، ساعت مفید روزها، تعداد تست، آستانه‌ها، نمره منفی'], ['combos', 'گرایش‌ها / ترکیب‌ها', 'گروه‌های دروس و فعال‌کردن آن‌ها'], ['backup', 'پشتیبان و بازیابی', 'خروجی و ورود فایل JSON'], ['bin', 'سطل بازیافت', 'بازگرداندن موارد حذف‌شده (۳۰ روز)'], ['audit', 'تاریخچه‌ی تغییرات', 'حذف‌ها و بازگردانی‌ها'], ['selftest', 'آزمون محاسبات', 'بررسی درستی محاسبه‌ها']];
+    const items = [['programs', 'برنامه‌های من', fa(ROOT.programs.length) + ' برنامه · هر آزمون و گرایش یک برنامه'], ['pro', isPro() ? 'پلن پیشرفته · فعال' : 'پلن پیشرفته', isPro() ? 'برنامه‌های نامحدود فعال است' : 'برنامه‌های نامحدود؛ ماهانه یا سالانه با ۵۰٪ تخفیف'], ['help', 'راهنما', 'آموزش ساده‌ی بخش‌ها، معرفی اپ و چک‌لیست شروع'], ['settings', 'تنظیمات', 'تاریخ آزمون، ساعت مفید روزها، تعداد تست، آستانه‌ها، نمره منفی'], S.combos.length ? ['combos', 'گروه‌های دروس', 'فعال‌کردن گروه‌های دروس این برنامه'] : null, ['backup', 'پشتیبان و بازیابی', 'خروجی و ورود فایل JSON'], ['bin', 'سطل بازیافت', 'بازگرداندن موارد حذف‌شده (۳۰ روز)'], ['audit', 'تاریخچه‌ی تغییرات', 'حذف‌ها و بازگردانی‌ها'], ['selftest', 'آزمون محاسبات', 'بررسی درستی محاسبه‌ها']];
     return top('بیشتر', esc(S.settings.examName)) + '<div class="card" id="syncbox">' + syncHtml() + '</div><div class="list" style="margin-top:12px">' + items.map(([k, t, s]) => '<button class="card tap" data-a="goMore" data-v="' + k + '"><b>' + t + '</b><div class="small muted">' + s + '</div></button>').join('') + '</div>';
   }
   function vSettings() {
     const s = S.settings; const j = L.keyToJalali(s.examDate);
     return top('تنظیمات') + '<form data-form="settings">' +
-      '<div class="card"><h3>آزمون</h3>' + txt('examName', 'نام آزمون یا رشته', s.examName) + txt('groupLabel', 'نام گروه‌بندی دروس (مثلاً ترکیب یا گرایش)', s.groupLabel) + '</div>' +
+      '<div class="card"><h3>آزمون</h3>' + txt('examName', 'نام آزمون یا رشته', s.examName) + txt('track', 'گرایش یا ترکیب (اختیاری)', s.track) + (S.combos.length ? txt('groupLabel', 'نام گروه‌بندی دروس', s.groupLabel) : '') + '</div>' +
       '<div class="card" style="margin-top:12px"><h3>تاریخ آزمون</h3><div class="grid4" style="grid-template-columns:1fr 1fr 1.4fr">' + num('jd', 'روز', j.jd) + num('jm', 'ماه', j.jm) + num('jy', 'سال', j.jy) + '</div></div>' +
       '<div class="card" style="margin-top:12px"><h3>ساعت مفید هر روز هفته</h3>' + capacityInputs(s.capacity) + '</div>' +
       '<div class="card" style="margin-top:12px"><h3>تست</h3>' + num('testCount', 'تعداد پیش‌فرض تست هر آزمون', s.testCount) + '<div class="grid2">' + num('masteryPct', 'تسلط مطلوب از (٪)', s.masteryPct) + num('reviewPct', 'مرور هدفمند از (٪)', s.reviewPct) + '</div><p class="small muted">زیر آستانه‌ی مرور هدفمند = تکرار چرخه. پیش‌فرض برای ۲۰ تست: ۱۸ به بالا تسلط، ۱۵ تا ۱۷ مرور.</p></div>' +
       '<div class="card" style="margin-top:12px"><h3>نمره منفی</h3><label class="check"><input type="checkbox" name="negOn" ' + (s.negOn ? 'checked' : '') + '><span>محاسبه‌ی درصد با نمره منفی (فیلد «غلط» اضافه می‌شود)</span></label>' + num('negRatio', 'هر چند غلط یک صحیح را حذف می‌کند', s.negRatio) + '</div>' +
       '<div class="card" style="margin-top:12px"><h3>ظاهر</h3><label class="f"><span>حالت نمایش</span><select name="theme"><option value="auto" ' + (s.theme === 'auto' ? 'selected' : '') + '>مطابق دستگاه</option><option value="light" ' + (s.theme === 'light' ? 'selected' : '') + '>روشن</option><option value="dark" ' + (s.theme === 'dark' ? 'selected' : '') + '>تیره</option></select></label></div>' +
       '<div id="seterr" class="err" role="alert"></div><button class="btn pri block big" style="margin-top:16px">ذخیره</button></form>' +
-      '<div class="card" style="margin-top:20px"><h3>شروع با رشته یا آزمون جدید</h3><p class="small muted">همه‌ی دروس، فصل‌ها، برنامه‌ها و نتیجه‌ها پاک می‌شوند و راه‌اندازی از اول انجام می‌شود. اول پشتیبان بگیرید.</p><button class="btn danger block" data-a="resetAll">پاک کردن و شروع دوباره</button></div>';
+      '<div class="card" style="margin-top:20px"><h3>پاک کردن این برنامه و شروع دوباره</h3><p class="small muted">دروس، فصل‌ها، برنامه‌ی هفتگی و نتیجه‌های همین برنامه پاک می‌شوند و راه‌اندازی آن از اول انجام می‌شود. برنامه‌های دیگر دست نمی‌خورند. اول پشتیبان بگیرید.</p><button class="btn danger block" data-a="resetAll">پاک کردن این برنامه</button></div>';
   }
   function vCombos() {
     return top(G() + '‌ها', 'فقط دروس ' + G() + '‌های فعال در برنامه می‌آیند. درسی که به هیچ ' + G() + 'ی وصل نباشد همیشه نمایش داده می‌شود.') + (S.combos.length ? '<div class="card">' + S.combos.map((c) => '<div class="row between" style="min-height:52px;border-bottom:1px solid var(--line)"><label class="check grow"><input type="checkbox" data-a="comboToggle" data-id="' + c.id + '" ' + (c.active ? 'checked' : '') + '><span>' + esc(comboLabel(c)) + (c.code && c.title ? ' — ' + esc(c.title) : '') + '</span></label><button class="iconbtn ghosti" data-a="comboForm" data-id="' + c.id + '" aria-label="ویرایش">' + ICON.edit + '</button></div>').join('') + '</div>' : '<div class="card empty">' + G() + 'ی تعریف نشده.</div>') + '<button class="btn block" style="margin-top:12px" data-a="comboForm">افزودن ' + G() + '</button>';
@@ -830,9 +853,21 @@
     resetTips: () => { S.settings.seenTips = {}; save(); toast('نکته‌ها دوباره در صفحه‌ها نمایش داده می‌شوند'); },
     hideChecklist: () => { S.settings.checklistHidden = true; save(); render(); toast('از «بیشتر ← راهنما» می‌توانید دوباره نمایشش دهید'); },
     showChecklist: () => { S.settings.checklistHidden = false; save(); setTab('today'); },
-    obPreset: (el) => { const v = el.dataset.v; if (v === S.settings.preset) return; if (v === 'custom') { S.courses = []; S.combos = []; S.settings.groupLabel = 'گرایش'; S.settings.examName = ''; } else { const d = defaultState(); S.courses = d.courses; S.combos = d.combos; S.settings.groupLabel = 'ترکیب'; S.settings.examName = 'کنکور دکتری مدیریت'; } S.settings.preset = v; ob.err = ''; render(); },
+    obPresetOld: (el) => { const v = el.dataset.v; if (v === S.settings.preset) return; if (v === 'custom') { S.courses = []; S.combos = []; S.settings.groupLabel = 'گرایش'; S.settings.examName = ''; } else { const d = defaultState(); S.courses = d.courses; S.combos = d.combos; S.settings.groupLabel = 'ترکیب'; S.settings.examName = 'کنکور دکتری مدیریت'; } S.settings.preset = v; ob.err = ''; render(); },
     obDelCombo: (el) => { S.combos = S.combos.filter((c) => c.id !== el.dataset.id); S.courses.forEach((c) => (c.combos = c.combos.filter((x) => x !== el.dataset.id))); render(); },
     obType: (el) => { const c = byId(S.courses, el.dataset.id); c.type = c.type === 'test' ? 'chapter' : 'test'; render(); },
+    obPreset: (el) => { const v = el.dataset.v; if (v === S.settings.preset) return; if (v === 'custom') { S.courses = []; S.combos = []; S.settings.preset = 'custom'; S.settings.examName = ''; S.settings.track = ''; } else applyTemplate(S, TEMPLATES.find((t) => t.id === v)); ob.err = ''; render(); },
+    programsSheet: () => programsSheet(),
+    switchProgram: (el) => switchProgram(el.dataset.id),
+    newProgram: () => createProgram(),
+    cancelNewProgram: () => { const id = ROOT.active, back = ROOT.prevActive; ROOT.programs = ROOT.programs.filter((p) => p.id !== id); delete ROOT.data[id]; ROOT.prevActive = null; ROOT.active = back; S = ROOT.data[back]; ob = null; nav = { tab: 'today', stack: [] }; writeLocal(); render(); },
+    delProgram: (el) => { const pr = ROOT.programs.find((p) => p.id === el.dataset.id); if (ROOT.programs.length < 2) return toast('تنها برنامه را نمی‌توان حذف کرد؛ از تنظیمات می‌توانید آن را پاک و از نو شروع کنید.'); if (S.timer && pr.id === ROOT.active) return toast('اول زمان‌سنج در جریان را تمام کنید');
+      confirmSheet('حذف برنامه‌ی «' + pr.title + '»؟', 'همه‌ی دروس، فصل‌ها و نتیجه‌های این برنامه برای همیشه پاک می‌شوند. برنامه‌های دیگر دست نمی‌خورند.', 'حذف برنامه', () => { ROOT.programs = ROOT.programs.filter((p) => p !== pr); delete ROOT.data[pr.id]; if (ROOT.freeProgram === pr.id) ROOT.freeProgram = ROOT.programs[0].id; if (ROOT.active === pr.id) { ROOT.active = ROOT.freeProgram; S = ROOT.data[ROOT.active]; } nav = { tab: 'today', stack: [] }; save(); render(); toast('برنامه حذف شد'); }, true); },
+    setFree: (el) => { if (isPro()) return; ROOT.freeProgram = el.dataset.id; writeLocal(); render(); },
+    goPro: () => { closeSheet(true); go('pro'); },
+    goProgramsPage: () => { closeSheet(true); if (nav.tab !== 'more') { nav.tab = 'more'; nav.stack = []; } go('programs'); },
+    buy: async (el) => { const btn = el; btn.disabled = true; try { await Billing.buy(el.dataset.v); render(); if (isPro()) toast('پلن پیشرفته فعال شد. ممنون از همراهی‌تان!'); } catch (e) { btn.disabled = false; const m = String((e && e.message) || e); toast(/cancel/i.test(m) ? 'پرداخت لغو شد' : 'پرداخت انجام نشد: ' + Billing.humanError(m)); } },
+    restorePro: async () => { try { await Billing.init(true); render(); toast(isPro() ? 'اشتراک شما بازیابی شد' : 'اشتراک فعالی در حساب بازار شما پیدا نشد'); } catch (e) { toast('بازیابی انجام نشد: ' + Billing.humanError(String(e))); } },
     fab: () => { if (S.timer) return A.resumeTimer(); startSheet(); },
     undo: () => { const f = undoFn; undoFn = null; document.querySelectorAll('.toast').forEach((x) => x.remove()); if (f) { f(); save(); render(); } },
     courseMenu: (el) => { const c = byId(S.courses, el.dataset.id); const list = visibleCourses(); const i = list.indexOf(c);
@@ -851,8 +886,8 @@
     toggleExclude: (el) => { const ch = byId(S.chapters, el.dataset.id); const was = ch.priority; ch.priority = was === 'excluded' ? 'mid' : 'excluded'; audit('exclude', (ch.priority === 'excluded' ? 'حذف از برنامه: ' : 'بازگشت به برنامه: ') + ch.title); save(); closeSheet(true); render(); toast(ch.priority === 'excluded' ? 'از برنامه حذف شد' : 'به برنامه برگشت', () => { ch.priority = was; }); },
     coursesBatch: () => sheet('<h2 style="margin-top:0">افزودن چند درس</h2><form data-form="coursesBatch">' + area('names', 'هر خط یک درس', '', 'ادبیات فارسی\nزبان انگلیسی\nریاضی') + '<label class="check"><input type="checkbox" name="test"><span>این دروس «فقط تست» هستند (بدون فصل)</span></label><div id="formerr" class="err" role="alert"></div><button class="btn pri block" style="margin-top:12px">افزودن</button></form>'),
     delCombo: (el) => { const cb = byId(S.combos, el.dataset.id); confirmSheet('حذف ' + comboLabel(cb) + '؟', 'دروس حذف نمی‌شوند؛ فقط ارتباطشان با این ' + G() + ' برداشته می‌شود.', 'حذف', () => { S.combos = S.combos.filter((c) => c !== cb); S.courses.forEach((c) => { c.combos = c.combos.filter((x) => x !== cb.id); delete c.coef[cb.id]; }); save(); render(); }, true); },
-    resetAll: () => confirmSheet('همه‌ی داده‌ها پاک شود؟', 'دروس، فصل‌ها، برنامه‌ها، دورها و نتیجه‌ها برای همیشه پاک می‌شوند و راه‌اندازی از اول شروع می‌شود. اگر پشتیبان نگرفته‌اید، انصراف بزنید.', 'پاک کن و شروع کن', () => { const keep = { capacity: S.settings.capacity, theme: S.settings.theme }; S = defaultState(); Object.assign(S.settings, keep, { introDone: true }); ob = null; nav = { tab: 'today', stack: [] }; save(); render(); }, true),
-    obNext: () => { ob.err = ''; if (ob.step === 0 && S.settings.preset === 'custom' && !S.settings.examName) { ob.err = 'نام آزمون را وارد کنید.'; return render(); } if (ob.step === 2 && !S.courses.some((c) => !c.deletedAt && !c.archived)) { ob.err = 'حداقل یک درس اضافه یا انتخاب کنید.'; return render(); } ob.step++; render(); window.scrollTo(0, 0); },
+    resetAll: () => confirmSheet('داده‌های این برنامه پاک شود؟', 'دروس، فصل‌ها، برنامه‌ی هفتگی، دورها و نتیجه‌های «' + esc(curProgram().title) + '» برای همیشه پاک می‌شوند. اگر پشتیبان نگرفته‌اید، انصراف بزنید.', 'پاک کن', () => { S = newProgramState(); ROOT.data[ROOT.active] = S; ob = null; nav = { tab: 'today', stack: [] }; save(); render(); }, true),
+    obNext: () => { ob.err = ''; if (ob.step === 0 && !S.settings.preset) { ob.err = 'یکی از گزینه‌ها را انتخاب کنید.'; return render(); } if (ob.step === 1 && !S.courses.some((c) => !c.deletedAt && !c.archived)) { ob.err = 'حداقل یک درس اضافه یا انتخاب کنید.'; return render(); } ob.step++; render(); window.scrollTo(0, 0); },
  obPrev: () => { ob.err = ''; ob.step--; render(); }, obFinish: () => finishOnboarding(),
     // plan
     week: (el) => { const d = Number(el.dataset.v); planWeek = d === 0 ? weekStart(todayKey()) : addDays(planWeek, d); render(); },
@@ -902,12 +937,12 @@
     langStart: (el) => { if (S.timer) return toast('یک زمان‌سنج دیگر در جریان است'); startTimer({ courseId: el.dataset.id, step: 'lang' }); render(); },
     delLang: (el) => { confirmSheet('حذف این آزمون؟', 'این رکورد برای همیشه حذف می‌شود.', 'حذف', () => { const l = byId(S.langLogs, el.dataset.id); S.langLogs = S.langLogs.filter((x) => x !== l); S.sessions = S.sessions.filter((s) => s.langLogId !== l.id); save(); render(); }, true); },
     exportJson: async () => {
-      const data = JSON.stringify(S, null, 1); const name = 'paramis-backup-' + todayKey() + '.json'; const note = $('#dlnote');
+      const data = JSON.stringify(Object.assign({}, ROOT, { pro: null }), null, 1); const name = 'masir-backup-' + todayKey() + '.json'; const note = $('#dlnote');
       const NB = window.NativeBridge;
       if (NB) {
         try {
           const res = await NB.Filesystem.writeFile({ path: name, data, directory: 'CACHE', encoding: 'utf8' });
-          await NB.Share.share({ title: 'پشتیبان پارامیس تک', files: [res.uri], dialogTitle: 'ذخیره یا ارسال فایل پشتیبان' });
+          await NB.Share.share({ title: 'پشتیبان مسیر', files: [res.uri], dialogTitle: 'ذخیره یا ارسال فایل پشتیبان' });
           S.settings.lastBackupAt = nowIso(); save(); render(); toast('فایل پشتیبان آماده شد');
         } catch (e) { if (note) note.textContent = 'ارسال فایل انجام نشد. از «کپی متن پشتیبان» استفاده کنید.'; }
         return;
@@ -916,7 +951,7 @@
       catch (e) { if (note) note.textContent = 'دانلود انجام نشد. از «کپی متن پشتیبان» استفاده کنید.'; return; }
       try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); S.settings.lastBackupAt = nowIso(); save(); if (note) note.textContent = 'اگر فایلی دانلود نشد، از «کپی متن پشتیبان» استفاده کنید.'; } catch (e) { if (note) note.textContent = 'دانلود در این نما ممکن نیست. از «کپی متن پشتیبان» استفاده کنید.'; }
     },
-    copyJson: async () => { try { await navigator.clipboard.writeText(JSON.stringify(S)); S.settings.lastBackupAt = nowIso(); save(); toast('متن پشتیبان کپی شد'); render(); } catch (e) { sheet('<h2 style="margin-top:0">متن پشتیبان</h2><p class="small muted">کپی خودکار ممکن نشد. متن زیر را انتخاب و کپی کنید.</p><textarea readonly style="min-height:240px;direction:ltr;font-size:11px">' + esc(JSON.stringify(S)) + '</textarea>'); } },
+    copyJson: async () => { try { await navigator.clipboard.writeText(JSON.stringify(Object.assign({}, ROOT, { pro: null }))); S.settings.lastBackupAt = nowIso(); save(); toast('متن پشتیبان کپی شد'); render(); } catch (e) { sheet('<h2 style="margin-top:0">متن پشتیبان</h2><p class="small muted">کپی خودکار ممکن نشد. متن زیر را انتخاب و کپی کنید.</p><textarea readonly style="min-height:240px;direction:ltr;font-size:11px">' + esc(JSON.stringify(Object.assign({}, ROOT, { pro: null }))) + '</textarea>'); } },
     importPaste: () => tryImport($('#pastebox').value),
   };
   function ensureStudyRound(chId) {
@@ -998,12 +1033,112 @@
     names.forEach((name) => { if (S.courses.some((c) => !c.deletedAt && c.name === name)) return; S.courses.push({ id: uid(), name, type: isTest ? 'test' : 'chapter', color: COLORS[S.courses.length % COLORS.length], combos: S.combos.filter((x) => x.active).map((x) => x.id), coef: {}, archived: false, order: maxO + 1 + n, createdAt: t, updatedAt: t, deletedAt: null }); n++; });
     return n;
   }
-  function finishOnboarding() { S.settings.onboarded = true; ob = null; nav = { tab: 'today', stack: [] }; save(); render(); }
+  function finishOnboarding() { S.settings.onboarded = true; ob = null; ROOT.prevActive = null; nav = { tab: 'today', stack: [] }; save(); render(); }
+  // ---------- programs ----------
+  function newProgramState() {
+    const st = defaultState();
+    st.settings.introDone = true; st.settings.seenTips = Object.assign({}, S ? S.settings.seenTips : {});
+    if (S) { st.settings.theme = S.settings.theme; st.settings.capacity = S.settings.capacity.slice(); st.settings.lastBackupAt = S.settings.lastBackupAt; st.settings.checklistHidden = true; }
+    return st;
+  }
+  function switchProgram(id) {
+    if (id === ROOT.active) return closeSheet(true);
+    if (S.timer) { toast('اول زمان‌سنج در جریان را تمام کنید'); return; }
+    ROOT.active = id; S = ROOT.data[id]; ob = null; nav = { tab: 'today', stack: [] }; writeLocal(); closeSheet(true); render(); window.scrollTo(0, 0);
+  }
+  function createProgram() {
+    closeSheet(true);
+    if (!isPro() && ROOT.programs.length >= 1) { go('pro', { reason: 'programs' }); return; }
+    if (S.timer) { toast('اول زمان‌سنج در جریان را تمام کنید'); return; }
+    const id = uid(); ROOT.prevActive = ROOT.active;
+    ROOT.programs.push({ id, title: 'برنامه‌ی جدید', createdAt: nowIso() }); ROOT.data[id] = newProgramState();
+    ROOT.active = id; S = ROOT.data[id]; ob = null; nav = { tab: 'today', stack: [] }; writeLocal(); render(); window.scrollTo(0, 0);
+  }
+  function programRow(pr) {
+    const d = ROOT.data[pr.id]; const active = pr.id === ROOT.active; const locked = !isPro() && pr.id !== ROOT.freeProgram && ROOT.programs.length > 1;
+    const days = L.daysBetween(todayKey(), d.settings.examDate); const nch = live(d.chapters).length;
+    return '<button class="mi" data-a="switchProgram" data-id="' + pr.id + '"><span class="cdot" style="width:14px;height:14px;background:' + (active ? 'var(--acc)' : 'var(--line)') + '"></span><span class="grow" style="min-width:0"><b>' + esc(pr.title) + '</b><br><span class="small muted">' + (d.settings.onboarded ? fa(nch) + ' فصل · ' + (days >= 0 ? fa(days) + ' روز تا آزمون' : 'آزمون گذشته') : 'راه‌اندازی نیمه‌کاره') + '</span></span>' + (active ? chip('فعال', 'acc') : locked ? chip('پیشرفته', 'warn') : '') + '</button>';
+  }
+  function programsSheet() {
+    const canNew = isPro() || ROOT.programs.length < 1;
+    sheet('<h2 style="margin-top:0">برنامه‌های من</h2><p class="small muted">هر آزمون و هر گرایش یک برنامه‌ی جداست' + (isPro() ? '.' : '؛ در پلن رایگان یک برنامه فعال است.') + '</p><div class="menu">' + ROOT.programs.map(programRow).join('') + '</div>' +
+      '<button class="btn ' + (canNew ? 'pri' : '') + ' block big" style="margin-top:12px" data-a="newProgram">برنامه‌ی جدید' + (canNew ? '' : ' · پلن پیشرفته') + '</button><button class="btn ghost block" style="margin-top:6px" data-a="goProgramsPage">مدیریت برنامه‌ها</button>');
+  }
+  function vPrograms() {
+    let h = top('برنامه‌های من', 'هر آزمون و هر گرایش یک برنامه‌ی جداست.');
+    h += '<div class="list">' + ROOT.programs.map((pr) => { const free = pr.id === ROOT.freeProgram;
+      return '<div class="card crs"><div class="row"><div class="grow"><div class="menu" style="box-shadow:none">' + programRow(pr) + '</div></div><button class="iconbtn ghosti" data-a="delProgram" data-id="' + pr.id + '" aria-label="حذف برنامه">×</button></div>' +
+        (!isPro() && ROOT.programs.length > 1 ? '<div class="small" style="padding:0 12px 6px">' + (free ? chip('برنامه‌ی رایگان شما', 'ok') : '<button class="btn sm ghost" data-a="setFree" data-id="' + pr.id + '">این را برنامه‌ی رایگان کن</button>') + '</div>' : '') + '</div>'; }).join('') + '</div>';
+    h += '<button class="btn pri block big" style="margin-top:14px" data-a="newProgram">برنامه‌ی جدید' + (isPro() || ROOT.programs.length < 1 ? '' : ' · پلن پیشرفته') + '</button>';
+    if (!isPro()) h += '<p class="small muted" style="margin-top:10px">در پلن رایگان یک برنامه با همه‌ی امکانات دارید. برای برنامه‌های بیشتر، پلن پیشرفته را فعال کنید.</p>';
+    return h;
+  }
+  function vLocked() {
+    const free = ROOT.programs.find((p) => p.id === ROOT.freeProgram);
+    return '<div style="margin-top:10px">' + BRAND + '</div><div class="card" style="margin-top:20px;text-align:center"><svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true"><rect x="12" y="28" width="40" height="30" rx="9" fill="#FFD166"/><path d="M20 28 v-8 a12 12 0 0 1 24 0 v8" fill="none" stroke="#2F4EBF" stroke-width="6" stroke-linecap="round"/><circle cx="32" cy="42" r="5" fill="#2F4EBF"/></svg><h1 style="font-size:20px">این برنامه به پلن پیشرفته نیاز دارد</h1><p class="muted">«' + esc(curProgram().title) + '» دومین برنامه‌ی شماست. داده‌هایش محفوظ است و با فعال‌کردن پلن پیشرفته دوباره در دسترس قرار می‌گیرد.</p>' +
+      '<button class="btn pri block big" style="margin-top:12px" data-a="goPro">دیدن پلن پیشرفته</button><button class="btn block" style="margin-top:8px" data-a="switchProgram" data-id="' + free.id + '">رفتن به برنامه‌ی رایگان: ' + esc(free.title) + '</button></div>';
+  }
+
+  // ---------- Pro plan & Bazaar billing ----------
+  const PRODUCTS = { monthly: 'masir_pro_monthly', yearly: 'masir_pro_yearly' };
+  const PRICE = { monthly: 20000, yearly: 120000 };
+  const Billing = {
+    state: 'web', msg: '', ready: false,
+    plugin() { return window.NativeBridge && window.NativeBridge.Billing; },
+    async init(force) {
+      const B = this.plugin(); if (!B) { this.state = 'web'; return; }
+      try {
+        const i = await B.info(); if (!i.configured) { this.state = 'unconfigured'; return; }
+        if (!this.ready || force) { await B.connect(); this.ready = true; }
+        this.state = 'ready'; await this.refresh();
+      } catch (e) { this.state = 'error'; this.msg = String((e && e.message) || e); if (force) throw e; }
+    },
+    async refresh() {
+      const B = this.plugin(); const r = await B.subscriptions(); const ids = Object.values(PRODUCTS);
+      const list = (r.list || []).filter((x) => x.state === 'PURCHASED' && ids.includes(x.productId)).sort((a, b) => b.purchaseTime - a.purchaseTime);
+      if (list.length) ROOT.pro = { until: Date.now() + 7 * 86400000, sku: list[0].productId, since: list[0].purchaseTime, checkedAt: Date.now(), source: 'bazaar' };
+      else if (ROOT.pro && ROOT.pro.source === 'bazaar') ROOT.pro = null;
+      writeLocal();
+    },
+    async buy(sku) {
+      if (this.state !== 'ready') { await this.init(true); if (this.state !== 'ready') throw new Error(this.state); }
+      const res = await this.plugin().subscribe({ sku, payload: 'masir-' + ROOT.active });
+      if (res && res.state === 'PURCHASED') { ROOT.pro = { until: Date.now() + 7 * 86400000, sku, since: res.purchaseTime, checkedAt: Date.now(), source: 'bazaar' }; writeLocal(); }
+      try { await this.refresh(); } catch (e) {}
+    },
+    humanError(m) {
+      if (/not_configured|unconfigured/.test(m)) return 'پرداخت هنوز در این نسخه فعال نشده است.';
+      if (/web/.test(m)) return 'پرداخت فقط در اپ اندروید نصب‌شده از کافه بازار ممکن است.';
+      if (/Bazaar is not installed|not installed|NotFound/i.test(m)) return 'اپ بازار روی گوشی نصب نیست.';
+      if (/login|Login/.test(m)) return 'در اپ بازار وارد حساب کاربری شوید.';
+      return 'اتصال به بازار برقرار نشد. اینترنت و ورود به حساب بازار را بررسی کنید.';
+    },
+  };
+  function vPro() {
+    const pro = isPro(); const yearlyPerMonth = PRICE.yearly / 12;
+    const card = (key, title, price, sub, badge) => '<div class="card plan' + (key === 'yearly' ? ' best' : '') + '">' + (badge ? '<span class="badge">' + badge + '</span>' : '') + '<div class="row between"><b style="font-size:17px">' + title + '</b><div style="text-align:left"><b class="num" style="font-size:20px">' + fa(price) + '</b> <span class="small muted">تومان</span></div></div><div class="small muted">' + sub + '</div>' +
+      (!pro ? '<button class="btn ' + (key === 'yearly' ? 'pri' : '') + ' block big" style="margin-top:10px" data-a="buy" data-v="' + PRODUCTS[key] + '" ' + (Billing.state === 'ready' ? '' : 'disabled') + '>' + (key === 'yearly' ? 'خرید اشتراک سالانه' : 'خرید اشتراک ماهانه') + '</button>' : '') + '</div>';
+    let h = top('پلن پیشرفته');
+    h += '<div class="prohero"><div class="row" style="gap:12px">' + LOGO + '<div><b style="font-size:19px">مسیر پیشرفته</b><div style="opacity:.9;font-size:13px">برای هر آزمون و هر گرایش، یک برنامه</div></div></div>' +
+      '<div class="pfeat">' + [['#FFD166', 'برنامه‌های نامحدود: هر آزمون و هر گرایش جدا'], ['#5CE1B0', 'جابه‌جایی سریع بین برنامه‌ها'], ['#FF9EB0', 'همه‌ی امکانات: برنامه‌ی هفتگی، زمان‌سنج، تست، مقایسه‌ی دورها، آمار'], ['#B9C6FF', 'داده‌های همه‌ی برنامه‌ها در یک فایل پشتیبان']].map(([c, t]) => '<div class="row" style="gap:10px;margin-top:8px"><span style="width:22px;height:22px;border-radius:7px;background:' + c + ';display:inline-flex;align-items:center;justify-content:center;color:#141B2D;font-size:14px;font-weight:700;flex:none">✓</span><span>' + t + '</span></div>').join('') + '</div></div>';
+    if (pro) h += '<div class="banner ok" style="margin-top:14px">پلن پیشرفته‌ی شما فعال است (' + (ROOT.pro.sku === PRODUCTS.yearly ? 'سالانه' : 'ماهانه') + '). تمدید و لغو اشتراک از بخش «اشتراک‌ها» در اپ بازار انجام می‌شود.</div>';
+    else {
+      if (Billing.state === 'web') h += '<div class="banner info" style="margin-top:14px">خرید اشتراک فقط در اپ اندروید «مسیر» که از کافه بازار نصب شده امکان‌پذیر است.</div>';
+      else if (Billing.state === 'unconfigured') h += '<div class="banner warn" style="margin-top:14px">پرداخت در این نسخه هنوز فعال نشده است.</div>';
+      else if (Billing.state === 'error') h += '<div class="banner warn" style="margin-top:14px">' + esc(Billing.humanError(Billing.msg)) + ' <button class="btn sm" data-a="restorePro" style="margin-right:6px">تلاش دوباره</button></div>';
+    }
+    h += '<div class="list" style="margin-top:14px">' + card('yearly', 'سالانه', PRICE.yearly, 'معادل ماهی ' + fa(yearlyPerMonth) + ' تومان · پرداخت یک‌جا برای ۱۲ ماه', '۵۰٪ تخفیف') + card('monthly', 'ماهانه', PRICE.monthly, 'تمدید خودکار هر ماه؛ هر وقت خواستید لغو کنید') + '</div>';
+    h += '<div class="card" style="margin-top:12px"><b>پلن رایگان</b><div class="small muted">یک برنامه با همه‌ی امکانات، برای همیشه رایگان.</div></div>';
+    if (Billing.state === 'ready' || Billing.state === 'error') h += '<button class="btn ghost block" style="margin-top:10px" data-a="restorePro">قبلاً خرید کرده‌ام؛ بازیابی اشتراک</button>';
+    h += '<p class="small muted" style="margin-top:10px">پرداخت از طریق کافه بازار انجام می‌شود. اشتراک به حساب بازار شما متصل است و روی گوشی جدید هم با «بازیابی اشتراک» برمی‌گردد.</p>';
+    return h;
+  }
+
   function tryImport(text) {
     const err = $('#imperr'); if (err) err.textContent = '';
-    let obj; try { obj = migrate(JSON.parse(text)); } catch (e) { if (err) err.textContent = 'فایل معتبر نیست: ' + (e.message && /[؀-ۿ]/.test(e.message) ? e.message : 'ساختار JSON خوانده نشد.'); return; }
-    const c = (k) => fa(live(obj[k]).length);
-    confirmSheet('جایگزینی داده‌ها با پشتیبان؟', 'پشتیبان شامل ' + c('courses') + ' درس، ' + c('chapters') + ' فصل، ' + fa(obj.rounds.length) + ' دور، ' + fa(obj.plans.length) + ' مورد برنامه و ' + fa(obj.sessions.length) + ' جلسه است. داده‌های فعلی جایگزین می‌شوند.', 'جایگزین کن', () => { S = obj; audit('import', 'بازیابی از پشتیبان'); save(); nav = { tab: 'today', stack: [] }; render(); toast('بازیابی انجام شد'); }, true);
+    let obj; try { obj = migrateRoot(JSON.parse(text)); } catch (e) { if (err) err.textContent = 'فایل معتبر نیست: ' + (e.message && /[؀-ۿ]/.test(e.message) ? e.message : 'ساختار JSON خوانده نشد.'); return; }
+    let nc = 0, nr = 0, ns = 0; obj.programs.forEach((pp) => { const d = obj.data[pp.id]; nc += live(d.chapters).length; nr += d.rounds.length; ns += d.sessions.length; });
+    confirmSheet('جایگزینی داده‌ها با پشتیبان؟', 'پشتیبان شامل ' + fa(obj.programs.length) + ' برنامه، ' + fa(nc) + ' فصل، ' + fa(nr) + ' دور و ' + fa(ns) + ' جلسه است. داده‌های فعلی جایگزین می‌شوند. وضعیت اشتراک از پشتیبان خوانده نمی‌شود.', 'جایگزین کن', () => { const pro = ROOT.pro; ROOT = obj; ROOT.pro = pro; S = ROOT.data[ROOT.active]; audit('import', 'بازیابی از پشتیبان'); save(); nav = { tab: 'today', stack: [] }; render(); toast('بازیابی انجام شد'); }, true);
   }
   function minutesField(f) { const m = L.parseNum(f.minutes ? f.minutes.value : ''); if (Number.isNaN(m) || (m != null && (m < 0 || m > 1440))) return NaN; return Math.round((m || 0) * 60); }
 
@@ -1020,7 +1155,7 @@
       if (f.finish.checked) { r.step = 'test'; r.readDoneAt = nowIso(); }
       save(); closeSheet(true); if (cur().s !== 'session' || cur().id !== r.id) go('session', { id: r.id }); else render(); toast(fmtDur(sec) + ' مطالعه ثبت شد' + (f.finish.checked ? '؛ حالا تست' : ''));
     },
-    obExam: (f) => { const v = f.examName.value.trim(); if (!v) { ob.err = 'نام آزمون را وارد کنید.'; return render(); } S.settings.examName = v; ob.err = ''; ob.step++; render(); },
+    obExam: (f) => { const v = f.examName.value.trim(); if (!v) { ob.err = 'نام آزمون را وارد کنید.'; return render(); } S.settings.examName = v; S.settings.track = f.track.value.trim(); ob.err = ''; ob.step++; render(); window.scrollTo(0, 0); },
     obAddCombo: (f) => { const t = f.t.value.trim(); if (!t) return; const code = /^[0-9۰-۹]+$/.test(t) ? L.toEnDigits(t) : ''; S.combos.push({ id: uid(), code, title: code ? '' : t, active: true }); render(); },
     obAddCourses: (f) => { addCoursesFromText(f.names.value, f.test.checked); ob.err = ''; render(); },
     coursesBatch: (f) => { const n = addCoursesFromText(f.names.value, f.test.checked); if (!n) return ($('#formerr', f).textContent = 'حداقل یک نام درس بنویسید.'); save(); closeSheet(); render(); toast(fa(n) + ' درس اضافه شد'); },
@@ -1112,7 +1247,7 @@
       if (v.reviewPct > v.masteryPct) return (err.textContent = 'آستانه‌ی مرور هدفمند نباید از تسلط بیشتر باشد.');
       v.testCount = Math.round(v.testCount);
       const en = f.examName.value.trim(); if (!en) return (err.textContent = 'نام آزمون را وارد کنید.');
-      Object.assign(S.settings, v, { examName: en, groupLabel: f.groupLabel.value.trim() || 'گروه', capacity: cap, examDate: L.jalaliToKey(y, m, d), negOn: f.negOn.checked, theme: f.theme.value }); save(); render(); toast('تنظیمات ذخیره شد');
+      Object.assign(S.settings, v, { examName: en, track: f.track.value.trim(), groupLabel: f.groupLabel ? (f.groupLabel.value.trim() || 'گروه') : S.settings.groupLabel, capacity: cap, examDate: L.jalaliToKey(y, m, d), negOn: f.negOn.checked, theme: f.theme.value }); save(); render(); toast('تنظیمات ذخیره شد');
     },
   };
 
@@ -1159,7 +1294,7 @@
   });
   document.addEventListener('submit', (e) => { const f = e.target; e.preventDefault(); const k = f.dataset.form; if (F[k]) F[k](f); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
-  window.addEventListener('storage', (e) => { if (e.key === KEY && e.newValue) { try { S = migrate(JSON.parse(e.newValue)); render(); } catch (x) {} } });
+  window.addEventListener('storage', (e) => { if (e.key === ROOT_KEY && e.newValue) { try { ROOT = migrateRoot(JSON.parse(e.newValue)); S = ROOT.data[ROOT.active]; render(); } catch (x) {} } });
 
   // ---------- boot ----------
   function nativeInit() {
@@ -1179,5 +1314,5 @@
       paint(); const ap = applyTheme; applyTheme = function () { ap(); paint(); };
     } catch (e) { console.error(e); }
   }
-  loadLocal(); purgeBin(); nativeInit(); render(); setInterval(tick, 1000); if (!window.NativeBridge) Cloud.init(); else { Cloud.status = 'off'; }
+  loadLocal(); purgeBin(); nativeInit(); render(); Billing.init().then(() => { if (cur().s === 'pro' || programLocked()) render(); }); setInterval(tick, 1000); if (!window.NativeBridge) Cloud.init(); else { Cloud.status = 'off'; }
 })();

@@ -51,27 +51,28 @@ jobs:
         env:
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: paramis
+          BAZAAR_RSA_KEY: ${{ secrets.BAZAAR_RSA_KEY }}
         run: |
           chmod +x gradlew
           if [ "$SIGNED" = "1" ]; then
             ./gradlew --no-daemon assembleRelease
-            cp app/build/outputs/apk/release/app-release.apk ../ParamisTechStudy-1.0.${VERSION_CODE}.apk
+            cp app/build/outputs/apk/release/app-release.apk ../Masir-1.0.${VERSION_CODE}.apk
           else
             ./gradlew --no-daemon assembleDebug
-            cp app/build/outputs/apk/debug/app-debug.apk ../ParamisTechStudy-1.0.${VERSION_CODE}-debug.apk
+            cp app/build/outputs/apk/debug/app-debug.apk ../Masir-1.0.${VERSION_CODE}-debug.apk
           fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ParamisTechStudy-apk
-          path: ParamisTechStudy-*.apk
+          name: Masir-apk
+          path: Masir-*.apk
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: Paramis Tech Study 1.0.${{ github.run_number }}
+          name: Masir 1.0.${{ github.run_number }}
           body: |
-            اپلیکیشن درسی پارامیس تک — نسخه‌ی 1.0.${{ github.run_number }}
+            مسیر · برنامه‌ریز مطالعه — نسخه‌ی 1.0.${{ github.run_number }}
             فایل APK زیر را روی گوشی اندروید دانلود و نصب کنید.
-          files: ParamisTechStudy-*.apk
+          files: Masir-*.apk
