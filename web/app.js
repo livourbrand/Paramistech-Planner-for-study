@@ -748,7 +748,7 @@
   // ---------- MORE ----------
   function vMore() {
     const items = [['programs', 'برنامه‌های من', fa(ROOT.programs.length) + ' برنامه · هر آزمون و گرایش یک برنامه'], ['pro', isPro() ? 'پلن پیشرفته · فعال' : 'پلن پیشرفته', isPro() ? 'برنامه‌های نامحدود فعال است' : 'برنامه‌های نامحدود؛ ماهانه یا سالانه با ۵۰٪ تخفیف'], ['help', 'راهنما', 'آموزش ساده‌ی بخش‌ها، معرفی اپ و چک‌لیست شروع'], ['settings', 'تنظیمات', 'تاریخ آزمون، ساعت مفید روزها، تعداد تست، آستانه‌ها، نمره منفی'], S.combos.length ? ['combos', 'گروه‌های دروس', 'فعال‌کردن گروه‌های دروس این برنامه'] : null, ['backup', 'پشتیبان و بازیابی', 'خروجی و ورود فایل JSON'], ['bin', 'سطل بازیافت', 'بازگرداندن موارد حذف‌شده (۳۰ روز)'], ['audit', 'تاریخچه‌ی تغییرات', 'حذف‌ها و بازگردانی‌ها'], ['selftest', 'آزمون محاسبات', 'بررسی درستی محاسبه‌ها']];
-    return top('بیشتر', esc(S.settings.examName)) + '<div class="card" id="syncbox">' + syncHtml() + '</div><div class="list" style="margin-top:12px">' + items.map(([k, t, s]) => '<button class="card tap" data-a="goMore" data-v="' + k + '"><b>' + t + '</b><div class="small muted">' + s + '</div></button>').join('') + '</div>';
+    return top('بیشتر', esc(S.settings.examName)) + '<div class="card" id="syncbox">' + syncHtml() + '</div><div class="list" style="margin-top:12px">' + items.filter(Boolean).map(([k, t, s]) => '<button class="card tap" data-a="goMore" data-v="' + k + '"><b>' + t + '</b><div class="small muted">' + s + '</div></button>').join('') + '</div>';
   }
   function vSettings() {
     const s = S.settings; const j = L.keyToJalali(s.examDate);
