@@ -46,6 +46,21 @@ jobs:
             echo "No signing key secret; building a debug APK instead."
           fi
 
+      - name: Check signing key
+        if: env.SIGNED == '1'
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          echo "Keystore file: $(wc -c < android/app/release.jks) bytes, sha256 $(sha256sum android/app/release.jks | cut -c1-16)"
+          echo "Password length: ${#KEYSTORE_PASSWORD} characters"
+          if keytool -list -keystore android/app/release.jks -storepass "$KEYSTORE_PASSWORD" >/dev/null 2>&1; then
+            echo "KEYSTORE CHECK: password OK"
+            keytool -list -keystore android/app/release.jks -storepass "$KEYSTORE_PASSWORD" | grep -i "fingerprint\|paramis"
+          else
+            echo "KEYSTORE CHECK: FAILED - password does not open this keystore (or keystore text is incomplete)"
+            exit 1
+          fi
+
       - name: Build APK
         working-directory: android
         env:
