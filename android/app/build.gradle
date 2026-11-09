@@ -11,7 +11,7 @@ android {
         versionCode((System.getenv("VERSION_CODE") ?: "1").toInteger())
         versionName "1.0." + (System.getenv("VERSION_CODE") ?: "1")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField "String", "BAZAAR_RSA", "\"" + (System.getenv("BAZAAR_RSA_KEY") ?: "").replaceAll("\\s", "") + "\""
+        buildConfigField "String", "BAZAAR_RSA", "\"" + (System.getenv("BAZAAR_RSA_KEY") ?: "MIHNMA0GCSqGSIb3DQEBAQUAA4G7ADCBtwKBrwCwqKO1VPhtELsId3SeUmSlNTdHGDqz2rbptBXGRAWAqi37/Z3ztegvu1zWEv4I5pnIT3zMk3DKb+DTd3sgEA9GM9vZj8WmgbrDADh2UAWpVD8XFfbHAxnpWhW/21hVIlIPc1LDB6yLx77OTzQkI4d0ezIw8iyfOqRINlrePPwwEwVn2AIWxsDWStnQVryWxEvpbHmjAtuSzyGRj4BdoS0eQ/kgmxfn6YIqTlLbUw0CAwEAAQ==").replaceAll("\\s", "") + "\""
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
